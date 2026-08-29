@@ -445,25 +445,53 @@ $('#up').onclick = async () => {
       $('#prog').textContent = `Staged ${nfmt(done)} of ${nfmt(clean.length)}…`;
     }
 
-    $('#prog').textContent = 'Committing — the field app switches over in one step…';
-    const {data, error} = await sb.rpc('commit_outlets', {p_mode: mode});
-    if(error) throw error;
+    // Supabase caps how long one statement may run, so the commit is driven
+    // here in batches. Each call is small; the loop runs until it says done.
+    let guard = 0, res = null;
+    for(;;){
+      if(++guard > 400) throw new Error('The load did not finish after 400 batches. Press Upload again to resume.');
+      const {data, error} = await sb.rpc('commit_outlets_chunk', {p_mode: mode, p_batch: 4000});
+      if(error) throw error;
+      res = Array.isArray(data) ? data[0] : data;
+      if(!res) throw new Error('The server returned nothing. Press Upload again to resume.');
+
+      if(res.phase === 'done') break;
+      if(res.phase === 'loading'){
+        const left = Number(res.remaining), placed = clean.length - left;
+        $('#bar').style.width = (92 + (placed / clean.length) * 6) + '%';
+        $('#prog').textContent = `Committing ${nfmt(placed)} of ${nfmt(clean.length)}…`;
+      } else {
+        $('#bar').style.width = '98%';
+        $('#prog').textContent = `Clearing ${nfmt(Number(res.remaining))} outlets no longer in the file…`;
+      }
+    }
 
     $('#bar').style.width = '100%';
-    const res = Array.isArray(data) ? data[0] : data;
     $('#prog').textContent = '';
     $('#upMsg').innerHTML = `<div class="note good"><b>Done.</b>
-      ${nfmt(res?.inserted ?? clean.length)} outlets loaded.
-      The list now holds ${nfmt(res?.total ?? 0)}. AEs pick this up on their next search.</div>`;
+      ${nfmt(clean.length)} outlets loaded.
+      The list now holds ${nfmt(Number(res?.total ?? 0))}. AEs pick this up on their next search.</div>`;
     loadCurrent();
   }catch(err){
     const m = err.message || String(err);
     $('#upMsg').innerHTML = `<div class="note bad"><b>Upload stopped.</b> ${esc(m)}<br><br>
       ${/row-level security|permission|admin/i.test(m)
         ? 'That account does not have the admin role. Set it in the SQL editor, then sign out and back in.'
-        : /does not exist|schema cache/i.test(m)
-        ? 'The outlet tables are missing — run <b>supabase/outlets.sql</b> in the SQL editor first.'
-        : 'Nothing was committed, so the live list is untouched. Fix the problem and run it again.'}</div>`;
+        : /commit_outlets_chunk|does not exist|schema cache/i.test(m)
+        ? 'The server is running an older version of <b>outlets.sql</b>. Re-run that file in the SQL editor, then try again.'
+        : /timeout/i.test(m)
+        ? 'The server ran out of time on a batch. Press Upload again — it carries on from where it stopped.'
+        : 'Press Upload again to resume from where it stopped.'}
+      <br><br><button class="btn btn-ghost" id="resetLoad" style="margin-top:4px">Cancel this load and start fresh</button></div>`;
+    const rb = document.getElementById('resetLoad');
+    if(rb) rb.onclick = async () => {
+      rb.innerHTML = '<span class="spin"></span>'; rb.disabled = true;
+      const {error} = await sb.rpc('commit_outlets_reset');
+      $('#upMsg').innerHTML = error
+        ? `<div class="note bad">Could not reset — ${esc(error.message)}</div>`
+        : '<div class="note">Cleared. Pick the file again and upload.</div>';
+      loadCurrent();
+    };
   }
   btn.textContent = 'Upload outlets'; btn.disabled = false;
 };
