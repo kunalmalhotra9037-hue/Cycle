@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Cycle Beat — Branch view</title>
 <link rel="stylesheet" href="vendor/leaflet.css">
+<script>window.addEventListener("error",function(e){if(e.target&&e.target.tagName==="LINK"&&/leaflet\.css/.test(e.target.href||"")){var l=document.createElement("link");l.rel="stylesheet";l.href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css";document.head.appendChild(l);}},true)</script>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
 <style>
 :root{--ink:#0F1724;--slate:#1B2536;--steel:#5A6779;--paper:#F6F7F9;--line:#DDE3EA;
@@ -139,7 +140,9 @@ tr:hover td{background:#FCFCFD}
 <div id="lightbox"><img alt=""></div>
 
 <script src="vendor/leaflet.js"></script>
+<script>if(typeof L === 'undefined')document.write('<scr'+'ipt src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"><\/scr'+'ipt>')</script>
 <script src="vendor/supabase.js"></script>
+<script>if(typeof supabase === 'undefined')document.write('<scr'+'ipt src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"><\/scr'+'ipt>')</script>
 <script src="config.js"></script>
 <script>
 

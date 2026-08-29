@@ -7,6 +7,7 @@
 <title>Cycle Beat — Outlet Coverage Planner</title>
 
 <link rel="stylesheet" href="vendor/leaflet.css">
+<script>window.addEventListener("error",function(e){if(e.target&&e.target.tagName==="LINK"&&/leaflet\.css/.test(e.target.href||"")){var l=document.createElement("link");l.rel="stylesheet";l.href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css";document.head.appendChild(l);}},true)</script>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 
 <style>
@@ -430,8 +431,11 @@ textarea.inp{resize:vertical;min-height:66px;line-height:1.45;overflow:hidden}
 <input type="file" id="photoInput" accept="image/*" multiple class="hide">
 
 <script src="vendor/leaflet.js"></script>
+<script>if(typeof L === 'undefined')document.write('<scr'+'ipt src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"><\/scr'+'ipt>')</script>
 <script src="vendor/jspdf.umd.min.js"></script>
+<script>if(!(window.jspdf))document.write('<scr'+'ipt src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"><\/scr'+'ipt>')</script>
 <script src="vendor/supabase.js"></script>
+<script>if(typeof supabase === 'undefined')document.write('<scr'+'ipt src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"><\/scr'+'ipt>')</script>
 <script src="config.js"></script>
 <script>
 /* =====================================================================
