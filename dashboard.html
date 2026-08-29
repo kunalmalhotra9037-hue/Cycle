@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cycle Beat — Branch view</title>
+<link rel="stylesheet" href="vendor/leaflet.css">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#0F1724;--slate:#1B2536;--steel:#5A6779;--paper:#F6F7F9;--line:#DDE3EA;
+  --signal:#E8930C;--signal-soft:#FDF3E0;--go:#12A150;--alert:#E5484D;--shadow:0 1px 2px rgba(15,23,36,.06),0 4px 14px rgba(15,23,36,.05)}
+*{box-sizing:border-box}
+body{margin:0;font-family:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  background:var(--paper);color:var(--ink);font-size:14.5px;line-height:1.45;-webkit-font-smoothing:antialiased}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer;border:none;background:none}
+.lbl{font-family:"Barlow Condensed",sans-serif;font-weight:600;text-transform:uppercase;
+  letter-spacing:.09em;font-size:12.5px;color:var(--steel)}
+.mono{font-family:"IBM Plex Mono",monospace;font-size:12px}
+
+.topbar{background:var(--ink);color:#fff;padding:12px 20px;display:flex;align-items:center;gap:14px;
+  position:sticky;top:0;z-index:900}
+.brand{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:22px;letter-spacing:.03em;line-height:1}
+.brand span{color:var(--signal)}
+.brand small{display:block;font-family:"IBM Plex Sans";font-weight:400;font-size:10.5px;
+  letter-spacing:.06em;text-transform:uppercase;color:#8A97AB;margin-top:2px}
+.topbar .who{margin-left:auto;font-size:12.5px;color:#8A97AB}
+.topbar .who button{color:var(--signal);margin-left:10px;font-size:12.5px}
+
+.wrap{max-width:1280px;margin:0 auto;padding:20px}
+.bar{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:18px}
+.bar > div{display:flex;flex-direction:column;gap:4px}
+.inp{padding:9px 11px;border:1.5px solid var(--line);border-radius:9px;background:#fff}
+.inp:focus{outline:none;border-color:var(--signal)}
+.btn{padding:9px 14px;border-radius:9px;font-weight:600;font-size:14px;border:1.5px solid transparent}
+.btn-primary{background:var(--ink);color:#fff}
+.btn-ghost{background:#fff;border-color:var(--line)}
+.btn-signal{background:var(--signal);color:#20160A}
+
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:18px}
+.kpi{background:#fff;border:1px solid var(--line);border-radius:10px;padding:13px;box-shadow:var(--shadow)}
+.kpi b{display:block;font-family:"Barlow Condensed";font-weight:700;font-size:28px;line-height:1.1}
+.kpi span{font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--steel)}
+
+.grid{display:grid;grid-template-columns:minmax(320px,420px) 1fr;gap:16px;align-items:start}
+@media(max-width:900px){.grid{grid-template-columns:1fr}}
+
+.card{background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);overflow:hidden}
+.card h2{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:17px;letter-spacing:.05em;
+  text-transform:uppercase;margin:0;padding:13px 15px;border-bottom:1px solid var(--line)}
+
+.beatRow{display:block;width:100%;text-align:left;padding:12px 15px;border-bottom:1px solid var(--line)}
+.beatRow:hover{background:var(--paper)}
+.beatRow[aria-current="true"]{background:var(--signal-soft);box-shadow:inset 3px 0 0 var(--signal)}
+.beatRow .t{font-weight:600}
+.beatRow .m{font-size:12px;color:var(--steel);margin-top:2px;display:flex;gap:10px;flex-wrap:wrap}
+.pillx{display:inline-block;padding:1px 7px;border-radius:10px;font-size:11px;font-weight:600}
+.pillx.open{background:var(--signal-soft);color:#8A5A05}
+.pillx.done{background:#E7F6EE;color:#0B6B36}
+
+#map{height:300px;border-bottom:1px solid var(--line)}
+
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{font-family:"Barlow Condensed",sans-serif;font-weight:600;text-transform:uppercase;letter-spacing:.07em;
+  font-size:12px;color:var(--steel);text-align:left;padding:9px 10px;border-bottom:1.5px solid var(--line);
+  position:sticky;top:0;background:#fff}
+td{padding:10px;border-bottom:1px solid #EFF2F6;vertical-align:top}
+tr:hover td{background:#FCFCFD}
+.st{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;white-space:nowrap}
+.st.visited{background:#E7F6EE;color:#0B6B36}
+.st.closed{background:#FDECEC;color:#9B1C1F}
+.st.notfound{background:#EEF1F5;color:#48566B}
+.st.pending{background:#F4F6F9;color:#8A97AB}
+.rem{max-width:380px;color:#25324a}
+.rem:empty::before{content:"—";color:#B6BFCC}
+.ph{display:flex;gap:5px;flex-wrap:wrap}
+.ph img{width:46px;height:46px;object-fit:cover;border-radius:6px;border:1px solid var(--line);cursor:zoom-in}
+
+.empty{padding:40px 20px;text-align:center;color:var(--steel)}
+.empty b{display:block;font-family:"Barlow Condensed";font-weight:700;font-size:18px;
+  text-transform:uppercase;letter-spacing:.05em;color:var(--ink);margin-bottom:6px}
+
+#gate{position:fixed;inset:0;z-index:2000;background:var(--ink);color:#fff;
+  display:flex;align-items:center;justify-content:center;padding:24px}
+#gate .box{width:100%;max-width:360px}
+#gate h1{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:30px;letter-spacing:.03em;margin:0 0 4px}
+#gate h1 span{color:var(--signal)}
+#gate p{color:#8A97AB;font-size:13.5px;margin:0 0 22px;line-height:1.5}
+#gate label{display:block;font-family:"Barlow Condensed",sans-serif;font-weight:600;text-transform:uppercase;
+  letter-spacing:.09em;font-size:13px;color:#8A97AB;margin:0 0 5px}
+#gate input{width:100%;padding:12px;border-radius:10px;border:1.5px solid #2C3A4E;background:#16202E;
+  color:#fff;font-size:16px;margin-bottom:14px}
+#gate input:focus{outline:none;border-color:var(--signal)}
+#gate .msg{font-size:13px;margin-top:12px;min-height:18px;color:#FF9A9D}
+.btn-block{width:100%;display:block}
+
+#lightbox{position:fixed;inset:0;background:rgba(15,23,36,.92);z-index:1500;display:none;
+  align-items:center;justify-content:center;padding:30px;cursor:zoom-out}
+#lightbox img{max-width:100%;max-height:100%;border-radius:8px}
+.spin{display:inline-block;width:14px;height:14px;border:2.5px solid rgba(255,255,255,.3);
+  border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">CYCLE<span>·</span>BEAT<small>Branch view</small></div>
+  <div class="who" id="who"></div>
+</div>
+
+<div class="wrap">
+  <div class="bar">
+    <div><span class="lbl">From</span><input class="inp" type="date" id="fFrom"></div>
+    <div><span class="lbl">To</span><input class="inp" type="date" id="fTo"></div>
+    <div><span class="lbl">AE</span><select class="inp" id="fAe"><option value="">Everyone</option></select></div>
+    <div><span class="lbl">Status</span><select class="inp" id="fStatus">
+      <option value="">All beats</option><option value="open">Open</option><option value="closed">Filed</option>
+    </select></div>
+    <button class="btn btn-primary" id="reload">Refresh</button>
+    <button class="btn btn-ghost" id="csvAll">Export visits as CSV</button>
+  </div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Beats</h2>
+      <div id="beatList"><div class="empty">Loading…</div></div>
+    </div>
+    <div class="card">
+      <h2 id="detailTitle">Select a beat</h2>
+      <div id="map"></div>
+      <div id="detail"><div class="empty"><b>Nothing selected</b>Pick a beat on the left to see every outlet, remark and photo.</div></div>
+    </div>
+  </div>
+</div>
+
+<div id="lightbox"><img alt=""></div>
+
+<script src="vendor/leaflet.js"></script>
+<script src="vendor/supabase.js"></script>
+<script src="config.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+if(!CONFIG.url || !CONFIG.anonKey){
+  document.body.innerHTML = '<div class="empty" style="padding:80px"><b>Not configured</b>Add your Supabase URL and anon key to config.js, then reload.</div>';
+  throw new Error('unconfigured');
+}
+const sb = supabase.createClient(CONFIG.url, CONFIG.anonKey, {auth:{persistSession:true}});
+
+let me = null, beats = [], current = null, visitCache = {};
+
+/* ------------------------------------------------------------------- map */
+const map = L.map('map', {zoomControl:true}).setView([17.385, 78.4867], 11);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+  {attribution:'&copy; OpenStreetMap &copy; CARTO', maxZoom:19}).addTo(map);
+const mLayer = L.layerGroup().addTo(map);
+
+/* ------------------------------------------------------------------ gate */
+const gate = document.createElement('div');
+gate.id = 'gate';
+gate.innerHTML = `<div class="box">
+  <h1>CYCLE<span>·</span>BEAT</h1>
+  <p>Branch view. Sign in with an account whose role is set to admin.</p>
+  <label for="e">Email</label><input id="e" type="email" autocomplete="username" autocapitalize="none">
+  <label for="p">Password</label><input id="p" type="password" autocomplete="current-password">
+  <button class="btn btn-signal btn-block" id="go">Sign in</button>
+  <div class="msg" id="m"></div></div>`;
+document.body.appendChild(gate);
+gate.querySelector('#go').onclick = async () => {
+  const b = gate.querySelector('#go');
+  b.innerHTML = '<span class="spin"></span>'; b.disabled = true;
+  const {error} = await sb.auth.signInWithPassword({
+    email: gate.querySelector('#e').value.trim(),
+    password: gate.querySelector('#p').value
+  });
+  b.textContent = 'Sign in'; b.disabled = false;
+  if(error){
+    const m = error.message || '';
+    gate.querySelector('#m').textContent =
+      /failed to fetch|networkerror|load failed/i.test(m) ? 'No connection to the server. Check your network and try again.'
+      : /invalid login/i.test(m) ? 'That email and password do not match.'
+      : m;
+  }
+};
+gate.querySelector('#p').addEventListener('keydown', e => { if(e.key === 'Enter') gate.querySelector('#go').click(); });
+
+sb.auth.onAuthStateChange(async (_e, session) => {
+  if(!session){ gate.style.display = 'flex'; return; }
+  me = session.user;
+  const {data: prof} = await sb.from('profiles').select('*').eq('id', me.id).maybeSingle();
+  $('#who').innerHTML = `${esc(prof?.full_name || me.email)} · ${esc(prof?.role || 'ae')}
+    <button id="out">Sign out</button>`;
+  $('#out').onclick = () => sb.auth.signOut();
+  gate.style.display = 'none';
+  if(prof?.role !== 'admin'){
+    $('#beatList').innerHTML = '<div class="empty"><b>Your beats only</b>This account is not an admin, so you can see just your own work.</div>';
+  }
+  await loadAes();
+  await load();
+});
+
+/* ------------------------------------------------------------------ load */
+async function loadAes(){
+  const {data} = await sb.from('profiles').select('id,full_name').order('full_name');
+  if(!data) return;
+  $('#fAe').innerHTML = '<option value="">Everyone</option>' +
+    data.map(p => `<option value="${p.id}">${esc(p.full_name || p.id.slice(0,8))}</option>`).join('');
+}
+
+async function load(){
+  $('#beatList').innerHTML = '<div class="empty">Loading…</div>';
+  let q = sb.from('beat_summary').select('*').order('created_at', {ascending:false}).limit(300);
+  const from = $('#fFrom').value, to = $('#fTo').value,
+        ae = $('#fAe').value, st = $('#fStatus').value;
+  if(from) q = q.gte('created_at', from + 'T00:00:00Z');
+  if(to)   q = q.lte('created_at', to   + 'T23:59:59Z');
+  if(ae)   q = q.eq('user_id', ae);
+  if(st === 'open')   q = q.is('closed_at', null);
+  if(st === 'closed') q = q.not('closed_at', 'is', null);
+
+  const {data, error} = await q;
+  if(error){ $('#beatList').innerHTML = `<div class="empty"><b>Could not load</b>${esc(error.message)}</div>`; return; }
+  beats = data || [];
+  renderKpis(); renderBeats();
+}
+
+function renderKpis(){
+  const t = beats.reduce((a,b) => ({
+    beats: a.beats + 1,
+    stops: a.stops + (+b.stops || 0),
+    visited: a.visited + (+b.visited || 0),
+    closed: a.closed + (+b.closed || 0) + (+b.notfound || 0),
+    photos: a.photos + (+b.photos || 0),
+    km: a.km + (+b.route_km || 0)
+  }), {beats:0, stops:0, visited:0, closed:0, photos:0, km:0});
+  const cov = t.stops ? Math.round(t.visited / t.stops * 100) : 0;
+  $('#kpis').innerHTML = [
+    [t.beats,'Beats'], [t.stops,'Outlets planned'], [t.visited,'Visited'],
+    [cov+'%','Strike rate'], [t.closed,'Closed / not found'],
+    [t.photos,'Photos'], [Math.round(t.km),'Road km']
+  ].map(([v,l]) => `<div class="kpi"><b>${v}</b><span>${l}</span></div>`).join('');
+}
+
+function renderBeats(){
+  if(!beats.length){
+    $('#beatList').innerHTML = '<div class="empty"><b>No beats yet</b>Nothing matches these filters.</div>';
+    return;
+  }
+  $('#beatList').innerHTML = beats.map(b => {
+    const d = new Date(b.created_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'});
+    const done = b.closed_at;
+    return `<button class="beatRow" data-id="${b.id}" aria-current="${current===b.id}">
+      <div class="t">${esc(b.beat_name || 'Unnamed beat')}
+        <span class="pillx ${done?'done':'open'}">${done?'Filed':'Open'}</span></div>
+      <div class="m">
+        <span>${esc(b.ae_name || '—')}</span><span>${d}</span>
+        <span>${b.visited||0}/${b.stops||0} done</span>
+        <span>${b.photos||0} photos</span>
+        ${b.route_km ? `<span>${(+b.route_km).toFixed(1)} km</span>` : ''}
+      </div></button>`;
+  }).join('');
+  document.querySelectorAll('.beatRow').forEach(el => el.onclick = () => openBeat(el.dataset.id));
+}
+
+/* ---------------------------------------------------------------- detail */
+async function openBeat(id){
+  current = id; renderBeats();
+  const b = beats.find(x => x.id === id);
+  $('#detailTitle').textContent = (b?.beat_name || 'Unnamed beat') + ' — ' + (b?.ae_name || '');
+  $('#detail').innerHTML = '<div class="empty">Loading outlets…</div>';
+
+  let vs = visitCache[id];
+  if(!vs){
+    const {data, error} = await sb.from('visits').select('*').eq('beat_id', id).order('seq');
+    if(error){ $('#detail').innerHTML = `<div class="empty"><b>Could not load</b>${esc(error.message)}</div>`; return; }
+    vs = visitCache[id] = data || [];
+  }
+
+  mLayer.clearLayers();
+  const pts = [];
+  vs.forEach(v => {
+    if(v.lat == null) return;
+    pts.push([v.lat, v.lon]);
+    const col = {visited:'#12A150', closed:'#E5484D', notfound:'#5A6779'}[v.status] || '#E8930C';
+    L.circleMarker([v.lat, v.lon], {radius:7, color:'#fff', weight:2, fillColor:col, fillOpacity:1})
+      .bindPopup(`<b>${v.seq}. ${esc(v.outlet_name)}</b><br>${esc(v.outlet_type)}<br>${esc(v.status)}`)
+      .addTo(mLayer);
+  });
+  if(pts.length){ L.polyline(pts, {color:'#E8930C', weight:3, opacity:.55, dashArray:'6,6'}).addTo(mLayer);
+                  map.fitBounds(L.latLngBounds(pts).pad(.2)); }
+
+  $('#detail').innerHTML = `
+    <div style="padding:10px 15px;display:flex;gap:10px;flex-wrap:wrap;border-bottom:1px solid var(--line)">
+      <button class="btn btn-ghost" id="csvOne">Export this beat</button>
+      <span style="color:var(--steel);font-size:13px;align-self:center">${vs.length} outlets</span>
+    </div>
+    <div style="overflow:auto;max-height:62vh"><table>
+      <thead><tr><th>#</th><th>Outlet</th><th>Type</th><th>Status</th><th>Remarks</th><th>Photos</th></tr></thead>
+      <tbody>${vs.map(v => `
+        <tr>
+          <td class="mono">${v.seq ?? ''}</td>
+          <td><b>${esc(v.outlet_name)}</b><div class="mono" style="color:var(--steel)">${esc(v.region)}, ${esc(v.state)} · ${v.lat?.toFixed(5)}, ${v.lon?.toFixed(5)}</div></td>
+          <td style="color:var(--steel)">${esc(v.outlet_type)}</td>
+          <td><span class="st ${v.status}">${v.status}</span></td>
+          <td class="rem">${esc(v.remarks || '')}</td>
+          <td><div class="ph" data-paths="${esc((v.photo_paths||[]).join('|'))}"></div></td>
+        </tr>`).join('')}</tbody>
+    </table></div>`;
+  $('#csvOne').onclick = () => csv(vs, (b?.beat_name || 'beat'));
+  loadPhotos();
+}
+
+async function loadPhotos(){
+  for(const box of document.querySelectorAll('.ph[data-paths]')){
+    const paths = box.dataset.paths.split('|').filter(Boolean);
+    box.removeAttribute('data-paths');
+    if(!paths.length){ box.textContent = '—'; box.style.color = '#B6BFCC'; continue; }
+    const {data} = await sb.storage.from('visit-photos').createSignedUrls(paths, 3600);
+    (data || []).forEach(u => {
+      if(!u.signedUrl) return;
+      const img = new Image();
+      img.src = u.signedUrl; img.loading = 'lazy'; img.alt = 'Outlet photo';
+      img.onclick = () => { $('#lightbox img').src = u.signedUrl; $('#lightbox').style.display = 'flex'; };
+      box.appendChild(img);
+    });
+  }
+}
+$('#lightbox').onclick = () => { $('#lightbox').style.display = 'none'; };
+
+/* -------------------------------------------------------------------- csv */
+function csv(rows, name){
+  const cols = ['seq','outlet_id','state','outlet_name','outlet_type','region','lat','lon',
+                'distance_km','status','remarks','photo_paths','updated_at'];
+  const cell = v => {
+    const s = Array.isArray(v) ? v.join(' ') : (v ?? '');
+    return /[",\n]/.test(s) ? '"' + String(s).replace(/"/g,'""') + '"' : s;
+  };
+  const out = [cols.join(',')].concat(rows.map(r => cols.map(c => cell(r[c])).join(','))).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['\ufeff'+out], {type:'text/csv;charset=utf-8'}));
+  a.download = `CycleBeat_${name.replace(/[^a-z0-9]+/gi,'-')}_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+}
+
+$('#csvAll').onclick = async () => {
+  const btn = $('#csvAll'); btn.innerHTML = '<span class="spin"></span> Building…'; btn.disabled = true;
+  const ids = beats.map(b => b.id);
+  let all = [];
+  for(let i = 0; i < ids.length; i += 40){
+    const {data} = await sb.from('visits').select('*').in('beat_id', ids.slice(i, i+40)).order('seq');
+    all = all.concat(data || []);
+  }
+  csv(all, 'all-beats');
+  btn.textContent = 'Export visits as CSV'; btn.disabled = false;
+};
+
+$('#reload').onclick = () => { visitCache = {}; load(); };
+['fFrom','fTo','fAe','fStatus'].forEach(id => $('#'+id).onchange = load);
+
+// default window: the last 30 days
+const t = new Date(), a = new Date(Date.now() - 30*864e5);
+$('#fTo').value = t.toISOString().slice(0,10);
+$('#fFrom').value = a.toISOString().slice(0,10);
+</script>
+</body>
+</html>

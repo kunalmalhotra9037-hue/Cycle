@@ -1,0 +1,1242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0F1724">
+<title>Cycle Beat — Outlet Coverage Planner</title>
+
+<link rel="stylesheet" href="vendor/leaflet.css">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --ink:#0F1724;
+  --slate:#1B2536;
+  --steel:#5A6779;
+  --paper:#F6F7F9;
+  --card:#FFFFFF;
+  --line:#DDE3EA;
+  --signal:#E8930C;
+  --signal-soft:#FDF3E0;
+  --go:#12A150;
+  --alert:#E5484D;
+  --sky:#2563EB;
+  --r:10px;
+  --shadow:0 1px 2px rgba(15,23,36,.06), 0 4px 14px rgba(15,23,36,.05);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  font-family:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  background:var(--paper); color:var(--ink);
+  font-size:15px; line-height:1.45;
+  -webkit-font-smoothing:antialiased;
+}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:none;background:none}
+
+/* ---------- structural labels: condensed, tracked, uppercase ---------- */
+.lbl{
+  font-family:"Barlow Condensed",sans-serif; font-weight:600;
+  text-transform:uppercase; letter-spacing:.09em; font-size:13px;
+  color:var(--steel);
+}
+.mono{font-family:"IBM Plex Mono",monospace;font-size:12px}
+
+/* ---------- app chrome ---------- */
+.topbar{
+  background:var(--ink); color:#fff;
+  padding:10px 14px calc(10px + env(safe-area-inset-top,0)) 14px;
+  padding-top:calc(10px + env(safe-area-inset-top,0));
+  display:flex;align-items:center;gap:10px;
+  position:sticky;top:0;z-index:900;
+}
+.brand{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:22px;letter-spacing:.03em;line-height:1}
+.brand span{color:var(--signal)}
+.brand small{display:block;font-family:"IBM Plex Sans";font-weight:400;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#8A97AB;margin-top:2px}
+.dataStat{margin-left:auto;text-align:right;font-size:11px;color:#8A97AB;line-height:1.3}
+.dataStat b{display:block;font-family:"Barlow Condensed";font-size:17px;font-weight:700;color:#fff;letter-spacing:.02em}
+
+.tabs{display:flex;background:var(--slate);position:sticky;top:0;z-index:890}
+.tabs button{
+  flex:1;padding:11px 4px 10px;color:#8A97AB;
+  font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:15px;
+  text-transform:uppercase;letter-spacing:.08em;
+  border-bottom:3px solid transparent;transition:color .15s,border-color .15s;
+}
+.tabs button[aria-selected="true"]{color:#fff;border-bottom-color:var(--signal)}
+.tabs button:focus-visible{outline:2px solid var(--signal);outline-offset:-3px}
+.tabs .badge{
+  display:inline-block;background:var(--signal);color:var(--ink);
+  border-radius:9px;padding:0 6px;margin-left:4px;font-size:12px;min-width:18px
+}
+
+.wrap{max-width:640px;margin:0 auto;padding:0 0 96px}
+
+/* ---------- map ---------- */
+#map{height:44vh;min-height:280px;background:#DFE4EA;z-index:1}
+.mapWrap{position:relative}
+.mapBadge{
+  position:absolute;left:10px;bottom:12px;z-index:500;
+  background:rgba(15,23,36,.88);color:#fff;padding:5px 10px;border-radius:20px;
+  font-family:"Barlow Condensed";font-weight:600;font-size:13px;letter-spacing:.05em;
+  text-transform:uppercase;pointer-events:none;
+}
+
+/* ---------- panels ---------- */
+.panel{background:var(--card);border-bottom:1px solid var(--line);padding:16px 14px}
+.panel h2{
+  font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:19px;
+  letter-spacing:.04em;text-transform:uppercase;margin:0 0 3px;
+}
+.panel .sub{color:var(--steel);font-size:13px;margin:0 0 14px}
+
+.field{margin-bottom:13px}
+.field > .lbl{display:block;margin-bottom:5px}
+.inp{
+  width:100%;padding:11px 12px;border:1.5px solid var(--line);border-radius:var(--r);
+  background:#fff;font-size:15px;
+}
+.inp:focus{outline:none;border-color:var(--signal);box-shadow:0 0 0 3px var(--signal-soft)}
+textarea.inp{resize:vertical;min-height:66px;line-height:1.45;overflow:hidden}
+
+.row{display:flex;gap:8px}
+.row .inp{flex:1;min-width:0}
+
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  padding:11px 15px;border-radius:var(--r);font-weight:600;font-size:14.5px;
+  border:1.5px solid transparent;transition:transform .08s,background .15s;
+}
+.btn:active{transform:scale(.98)}
+.btn:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.btn-primary{background:var(--ink);color:#fff}
+.btn-signal{background:var(--signal);color:#20160A}
+.btn-ghost{background:#fff;border-color:var(--line);color:var(--slate)}
+.btn-go{background:var(--go);color:#fff}
+.btn-block{width:100%}
+.btn[disabled]{opacity:.45;pointer-events:none}
+
+/* segmented control */
+.seg{display:flex;border:1.5px solid var(--line);border-radius:var(--r);overflow:hidden;background:#fff}
+.seg button{
+  flex:1;padding:9px 6px;font-family:"Barlow Condensed";font-weight:600;font-size:14px;
+  text-transform:uppercase;letter-spacing:.06em;color:var(--steel);
+}
+.seg button[aria-pressed="true"]{background:var(--ink);color:#fff}
+
+/* chips */
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{
+  padding:6px 11px;border:1.5px solid var(--line);border-radius:16px;background:#fff;
+  font-size:13px;color:var(--steel);white-space:nowrap;
+}
+.chip[aria-pressed="true"]{background:var(--signal-soft);border-color:var(--signal);color:#8A5A05;font-weight:600}
+
+/* slider */
+.slide{display:flex;align-items:center;gap:12px}
+.slide input[type=range]{flex:1;accent-color:var(--signal);height:26px}
+.slideVal{
+  font-family:"Barlow Condensed";font-weight:700;font-size:21px;min-width:64px;text-align:right;
+}
+.slideVal em{font-style:normal;font-size:12px;color:var(--steel);font-family:"IBM Plex Sans";font-weight:400}
+
+/* readout strip */
+.readout{display:flex;gap:1px;background:var(--line);border-radius:var(--r);overflow:hidden;margin-top:4px}
+.readout div{flex:1;background:#fff;padding:9px 8px;text-align:center}
+.readout b{display:block;font-family:"Barlow Condensed";font-weight:700;font-size:21px;line-height:1.15}
+.readout span{font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--steel)}
+.readout .warn b{color:var(--signal)}
+
+/* ---------- the route spine (signature element) ---------- */
+.spineList{padding:6px 0 0}
+.stop{display:flex;gap:12px;padding:0 14px;position:relative}
+.rail{position:relative;width:30px;flex:0 0 30px;display:flex;justify-content:center}
+.rail::before,.rail::after{
+  content:"";position:absolute;left:50%;transform:translateX(-50%);
+  width:2.5px;background:var(--signal);opacity:.35;
+}
+.rail::before{top:0;height:20px}
+.rail::after{top:20px;bottom:0}
+.stop:first-child .rail::before{display:none}
+.stop:last-child .rail::after{display:none}
+.node{
+  position:relative;z-index:2;margin-top:8px;
+  width:26px;height:26px;border-radius:50%;
+  background:#fff;border:2.5px solid var(--signal);
+  display:flex;align-items:center;justify-content:center;
+  font-family:"Barlow Condensed";font-weight:700;font-size:14px;color:#8A5A05;
+  transition:background .2s,border-color .2s,color .2s;
+}
+.stop[data-status="visited"] .node{background:var(--go);border-color:var(--go);color:#fff}
+.stop[data-status="closed"] .node{background:var(--alert);border-color:var(--alert);color:#fff}
+.stop[data-status="notfound"] .node{background:var(--steel);border-color:var(--steel);color:#fff}
+
+.stopCard{
+  flex:1;min-width:0;background:var(--card);border:1px solid var(--line);
+  border-radius:var(--r);padding:12px;margin-bottom:10px;box-shadow:var(--shadow);
+}
+.stopHead{display:flex;gap:8px;align-items:flex-start}
+.stopName{font-weight:600;font-size:15px;line-height:1.3;flex:1;min-width:0;word-break:break-word}
+.stopMeta{font-size:12px;color:var(--steel);margin-top:3px;display:flex;flex-wrap:wrap;gap:4px 9px}
+.stopMeta .tag{background:var(--paper);border-radius:4px;padding:1px 6px}
+.navBtn{
+  flex:0 0 auto;width:38px;height:38px;border-radius:9px;background:var(--paper);
+  border:1px solid var(--line);display:flex;align-items:center;justify-content:center;
+}
+.statusRow{display:flex;gap:6px;margin:11px 0 9px}
+.statusRow button{
+  flex:1;min-width:0;padding:8px 2px;border-radius:8px;border:1.5px solid var(--line);background:#fff;
+  font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:12.5px;letter-spacing:.02em;
+  text-transform:uppercase;color:var(--steel);white-space:nowrap;
+}
+.statusRow button[aria-pressed="true"][data-s="visited"]{background:var(--go);border-color:var(--go);color:#fff}
+.statusRow button[aria-pressed="true"][data-s="closed"]{background:var(--alert);border-color:var(--alert);color:#fff}
+.statusRow button[aria-pressed="true"][data-s="notfound"]{background:var(--steel);border-color:var(--steel);color:#fff}
+
+.photoStrip{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px;align-items:center}
+.thumb{position:relative;width:58px;height:58px;border-radius:8px;overflow:hidden;border:1px solid var(--line)}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.thumb button{
+  position:absolute;top:2px;right:2px;width:19px;height:19px;border-radius:50%;
+  background:rgba(15,23,36,.8);color:#fff;font-size:13px;line-height:1;
+  display:flex;align-items:center;justify-content:center;
+}
+.addPhoto{
+  width:58px;height:58px;border-radius:8px;border:1.5px dashed var(--line);
+  background:#fff;color:var(--steel);font-size:11px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+}
+.addPhoto svg{opacity:.6}
+
+/* ---------- report ---------- */
+.statGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;margin-bottom:16px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:12px}
+.stat b{display:block;font-family:"Barlow Condensed";font-weight:700;font-size:27px;line-height:1.1}
+.stat span{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--steel)}
+
+/* ---------- sticky action bar ---------- */
+.dock{
+  position:fixed;left:0;right:0;bottom:0;z-index:880;
+  background:rgba(255,255,255,.96);backdrop-filter:blur(8px);
+  border-top:1px solid var(--line);
+  padding:10px 14px calc(10px + env(safe-area-inset-bottom,0));
+}
+.dock .inner{max-width:640px;margin:0 auto;display:flex;gap:8px}
+.dock .btn{flex:1}
+
+/* ---------- misc ---------- */
+.empty{padding:44px 24px;text-align:center;color:var(--steel)}
+.empty b{display:block;font-family:"Barlow Condensed";font-weight:700;font-size:20px;
+  text-transform:uppercase;letter-spacing:.05em;color:var(--ink);margin-bottom:6px}
+.hide{display:none !important}
+.toast{
+  position:fixed;left:50%;bottom:84px;transform:translateX(-50%) translateY(12px);
+  background:var(--ink);color:#fff;padding:11px 17px;border-radius:24px;font-size:14px;
+  z-index:1000;opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;
+  max-width:88vw;text-align:center;
+}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+.err{background:var(--alert)}
+
+.geoRes{border:1px solid var(--line);border-radius:var(--r);margin-top:6px;overflow:hidden;background:#fff}
+.geoRes button{display:block;width:100%;text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);font-size:13.5px}
+.geoRes button:last-child{border-bottom:none}
+.geoRes button:hover,.geoRes button:focus-visible{background:var(--signal-soft);outline:none}
+
+.spin{
+  display:inline-block;width:15px;height:15px;border:2.5px solid rgba(255,255,255,.3);
+  border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite
+}
+.btn-ghost .spin{border-color:rgba(90,103,121,.3);border-top-color:var(--steel)}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+.numMarker{
+  background:var(--signal);color:#20160A;border:2px solid #fff;border-radius:50%;
+  width:26px;height:26px;display:flex;align-items:center;justify-content:center;
+  font-family:"Barlow Condensed";font-weight:700;font-size:14px;
+  box-shadow:0 1px 5px rgba(0,0,0,.35);
+}
+.numMarker.done{background:var(--go);color:#fff}
+.startMarker{
+  background:var(--ink);color:#fff;border:2px solid #fff;border-radius:50% 50% 50% 4px;
+  width:28px;height:28px;transform:rotate(-45deg);
+  display:flex;align-items:center;justify-content:center;box-shadow:0 1px 5px rgba(0,0,0,.35);
+}
+.startMarker span{transform:rotate(45deg);font-family:"Barlow Condensed";font-weight:700;font-size:12px}
+
+.note{font-size:12.5px;color:var(--steel);background:var(--paper);border-left:3px solid var(--signal);
+  padding:9px 11px;border-radius:0 6px 6px 0;margin-top:10px;line-height:1.5}
+
+@media (min-width:1024px){
+  .wrap{max-width:1080px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+    gap:0 22px;align-items:start;padding-bottom:110px}
+  .mapWrap{position:sticky;top:46px;grid-column:1;border-radius:var(--r);overflow:hidden;
+    box-shadow:var(--shadow);margin-top:16px}
+  #map{height:calc(100vh - 150px);min-height:420px}
+  .paneRight{grid-column:2;padding-top:16px}
+  .panel{border:1px solid var(--line);border-radius:var(--r);margin-bottom:14px;box-shadow:var(--shadow)}
+  .dock .inner{max-width:1080px}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.01ms !important;transition-duration:.01ms !important}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">CYCLE<span>·</span>BEAT<small>Outlet coverage planner</small></div>
+  <div class="dataStat"><b id="loadedCount">—</b>outlets in range</div>
+</div>
+
+<div class="tabs" role="tablist">
+  <button role="tab" aria-selected="true" data-tab="plan">Plan</button>
+  <button role="tab" aria-selected="false" data-tab="stops">Stops<span class="badge hide" id="stopBadge">0</span></button>
+  <button role="tab" aria-selected="false" data-tab="report">Report</button>
+</div>
+
+<div class="wrap">
+
+  <div class="mapWrap" id="mapWrap">
+    <div id="map"></div>
+    <div class="mapBadge" id="mapBadge">Set a starting point</div>
+  </div>
+
+  <div class="paneRight">
+
+  <!-- ============ PLAN ============ -->
+  <section id="tab-plan">
+    <div class="panel">
+      <h2>Where are you starting?</h2>
+      <p class="sub">Use your live location, or search any market, town or landmark.</p>
+
+      <div class="field">
+        <button class="btn btn-primary btn-block" id="gpsBtn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8"/></svg>
+          Use my current location
+        </button>
+      </div>
+
+      <div class="field">
+        <span class="lbl">Start point</span>
+        <div class="row">
+          <input class="inp" id="startQ" placeholder="e.g. Ameerpet, Hyderabad" autocomplete="off">
+          <button class="btn btn-ghost" id="startGo">Find</button>
+        </div>
+        <div class="geoRes hide" id="startRes"></div>
+      </div>
+
+      <div class="field">
+        <span class="lbl">End point <span style="text-transform:none;letter-spacing:0;font-family:'IBM Plex Sans';font-weight:400">— optional</span></span>
+        <div class="row">
+          <input class="inp" id="endQ" placeholder="Leave blank for a loop around the start">
+          <button class="btn btn-ghost" id="endGo">Find</button>
+        </div>
+        <div class="geoRes hide" id="endRes"></div>
+        <div class="note" id="endNote">With an end point set, the app finds outlets along the corridor between the two, not just around the start.</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Coverage</h2>
+      <p class="sub">How far off the route the AE is willing to go.</p>
+
+      <div class="field">
+        <span class="lbl">Search radius</span>
+        <div class="slide">
+          <input type="range" id="radius" min="1" max="25" step="1" value="20">
+          <div class="slideVal"><span id="radiusVal">20</span> <em>km</em></div>
+        </div>
+      </div>
+
+      <div class="field">
+        <span class="lbl">Maximum stops on the beat</span>
+        <div class="slide">
+          <input type="range" id="maxStops" min="5" max="40" step="1" value="20">
+          <div class="slideVal"><span id="maxStopsVal">20</span> <em>stops</em></div>
+        </div>
+      </div>
+
+      <div class="field">
+        <span class="lbl">Outlet types</span>
+        <div class="chips" id="typeChips"></div>
+      </div>
+
+      <div class="readout" id="readout">
+        <div><b id="roInRange">—</b><span>In radius</span></div>
+        <div class="warn"><b id="roPlanned">—</b><span>On beat</span></div>
+        <div><b id="roDist">—</b><span>Road km</span></div>
+      </div>
+
+      <div class="note" id="densityNote"></div>
+    </div>
+  </section>
+
+  <!-- ============ STOPS ============ -->
+  <section id="tab-stops" class="hide">
+    <div class="panel" id="stopsHeader">
+      <h2>Beat sheet</h2>
+      <p class="sub">Tap a stop to log what you found. Everything saves on this phone as you go.</p>
+      <div class="row">
+        <button class="btn btn-ghost" style="flex:1" id="waBtn">Share route on WhatsApp</button>
+      </div>
+    </div>
+    <div class="spineList" id="spineList"></div>
+    <div class="empty hide" id="stopsEmpty">
+      <b>No beat built yet</b>
+      Set a starting point on the Plan tab, then build the route.
+    </div>
+  </section>
+
+  <!-- ============ REPORT ============ -->
+  <section id="tab-report" class="hide">
+    <div class="panel">
+      <h2>Visit summary</h2>
+      <p class="sub">These details go on the header of the PDF.</p>
+
+      <div class="field">
+        <span class="lbl">AE name</span>
+        <input class="inp" id="aeName" placeholder="Your name">
+      </div>
+      <div class="row" style="gap:10px">
+        <div class="field" style="flex:1">
+          <span class="lbl">Branch</span>
+          <input class="inp" id="aeBranch" placeholder="SHYD" value="SHYD">
+        </div>
+        <div class="field" style="flex:1">
+          <span class="lbl">Beat / area</span>
+          <input class="inp" id="aeBeat" placeholder="e.g. Ameerpet North">
+        </div>
+      </div>
+
+      <div class="statGrid" id="statGrid"></div>
+
+      <button class="btn btn-ghost btn-block" id="resetBtn">Clear this beat and start over</button>
+    </div>
+  </section>
+
+  </div><!-- /paneRight -->
+</div><!-- /wrap -->
+
+<div class="dock">
+  <div class="inner" id="dockInner">
+    <button class="btn btn-signal btn-block" id="buildBtn" disabled>Build optimised route</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<input type="file" id="photoInput" accept="image/*" multiple class="hide">
+
+<script src="vendor/leaflet.js"></script>
+<script src="vendor/jspdf.umd.min.js"></script>
+<script src="vendor/supabase.js"></script>
+<script src="config.js"></script>
+<script>
+/* =====================================================================
+   CYCLE BEAT
+   Field route planner over Cycle-serviced outlets that ITC does not reach.
+   Data: 0.5-degree tiles in ./data, loaded only for the area in view.
+   ===================================================================== */
+
+const S = {                       // application state
+  meta:null,
+  tiles:new Map(),                // tileKey -> array of outlets
+  start:null,                     // {lat,lon,label}
+  end:null,
+  radius:20,
+  maxStops:20,
+  types:new Set(),
+  inRange:[],                     // outlets inside radius/corridor, sorted by distance
+  beat:[],                        // ordered stops on the route
+  manual:new Map(),               // key -> true(forced in) / false(forced out)
+  logs:{},                        // key -> {status, remarks, photos:[{d,w,h}]}
+  routeKm:null,
+  routeMin:null,
+  beatId:null,
+  tab:'plan'
+};
+
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const KEY = o => o.st + '-' + o.id;
+
+/* ---------------------------------------------------------------- utils */
+function toast(msg, isErr){
+  const t = $('#toast');
+  t.textContent = msg;
+  t.className = 'toast on' + (isErr ? ' err' : '');
+  clearTimeout(t._t);
+  t._t = setTimeout(()=> t.className = 'toast', isErr ? 4200 : 2400);
+}
+const R_EARTH = 6371;
+function hav(aLat,aLon,bLat,bLon){
+  const p = Math.PI/180;
+  const dLat=(bLat-aLat)*p, dLon=(bLon-aLon)*p;
+  const s = Math.sin(dLat/2)**2 + Math.cos(aLat*p)*Math.cos(bLat*p)*Math.sin(dLon/2)**2;
+  return 2*R_EARTH*Math.asin(Math.sqrt(s));
+}
+// perpendicular distance from a point to the segment A-B, in km
+function segDist(pLat,pLon, aLat,aLon, bLat,bLon){
+  const kx = 111.32*Math.cos(pLat*Math.PI/180), ky = 110.57;
+  const ax=aLon*kx, ay=aLat*ky, bx=bLon*kx, by=bLat*ky, px=pLon*kx, py=pLat*ky;
+  const dx=bx-ax, dy=by-ay;
+  const len = dx*dx+dy*dy;
+  let t = len ? ((px-ax)*dx+(py-ay)*dy)/len : 0;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(px-(ax+t*dx), py-(ay+t*dy));
+}
+const fmtKm = k => k==null ? '—' : (k<10 ? k.toFixed(1) : Math.round(k));
+
+/* ------------------------------------------------------------- map setup */
+const map = L.map('map', {zoomControl:false, attributionControl:true})
+  .setView([17.385, 78.4867], 11);
+L.control.zoom({position:'topright'}).addTo(map);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{
+  attribution:'&copy; OpenStreetMap &copy; CARTO', maxZoom:19
+}).addTo(map);
+
+const layers = {
+  dots: L.layerGroup().addTo(map),      // nearby outlets not on the beat
+  route: L.layerGroup().addTo(map),     // route line
+  stops: L.layerGroup().addTo(map),     // numbered beat stops
+  anchor: L.layerGroup().addTo(map)     // start / end pins
+};
+
+/* ------------------------------------------------------- data tile loader */
+async function loadMeta(){
+  try{
+    const r = await fetch('data/manifest.json');
+    if(!r.ok) throw new Error(r.status);
+    S.meta = await r.json();
+    S.meta.tileSet = new Set(S.meta.tiles);
+    S.meta.types.forEach(t => S.types.add(t));
+    renderTypeChips();
+  }catch(e){
+    toast('Could not load the outlet data. This page has to be served over http — open it from GitHub Pages, not straight off the file system.', true);
+    console.error(e);
+  }
+}
+function tileKey(lat,lon){
+  const st = S.meta.step;
+  return Math.floor(lat/st) + '_' + Math.floor(lon/st);
+}
+async function loadArea(lat, lon, km){
+  const st = S.meta.step;
+  const dLat = km/110.57, dLon = km/(111.32*Math.cos(lat*Math.PI/180));
+  const keys = [];
+  for(let y = Math.floor((lat-dLat)/st); y <= Math.floor((lat+dLat)/st); y++)
+    for(let x = Math.floor((lon-dLon)/st); x <= Math.floor((lon+dLon)/st); x++){
+      const k = y+'_'+x;
+      if(S.meta.tileSet.has(k) && !S.tiles.has(k)) keys.push(k);
+    }
+  await Promise.all(keys.map(async k => {
+    try{
+      const r = await fetch(`data/t${k}.json`);
+      const rows = await r.json();
+      S.tiles.set(k, rows.map(v => ({
+        id:v[0], name:v[1], lat:v[2]/100000, lon:v[3]/100000,
+        type:S.meta.types[v[4]], region:S.meta.regions[v[5]], st:S.meta.states[v[6]]
+      })));
+    }catch(e){ S.tiles.set(k, []); }
+  }));
+}
+function tilesNear(lat, lon, km){
+  const st = S.meta.step, out = [];
+  const dLat = km/110.57, dLon = km/(111.32*Math.cos(lat*Math.PI/180));
+  for(let y = Math.floor((lat-dLat)/st); y <= Math.floor((lat+dLat)/st); y++)
+    for(let x = Math.floor((lon-dLon)/st); x <= Math.floor((lon+dLon)/st); x++){
+      const t = S.tiles.get(y+'_'+x);
+      if(t) out.push(...t);
+    }
+  return out;
+}
+
+/* ------------------------------------------------------------- geocoding */
+async function geocode(q){
+  const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=5&countrycodes=in&q=' + encodeURIComponent(q);
+  const r = await fetch(url, {headers:{'Accept-Language':'en'}});
+  if(!r.ok) throw new Error('geocode failed');
+  return (await r.json()).map(x => ({lat:+x.lat, lon:+x.lon, label:x.display_name}));
+}
+function wireSearch(inputSel, btnSel, resSel, which){
+  const inp = $(inputSel), btn = $(btnSel), res = $(resSel);
+  async function run(){
+    const q = inp.value.trim();
+    if(q.length < 3){ toast('Type at least 3 characters'); return; }
+    btn.innerHTML = '<span class="spin"></span>';
+    try{
+      const hits = await geocode(q);
+      res.innerHTML = '';
+      if(!hits.length){
+        res.innerHTML = '<button disabled style="color:var(--steel)">Nothing found. Try adding the district or state.</button>';
+      } else hits.forEach(h => {
+        const b = document.createElement('button');
+        b.textContent = h.label;
+        b.onclick = () => { setPoint(which, h); res.classList.add('hide'); inp.value = h.label.split(',')[0]; };
+        res.appendChild(b);
+      });
+      res.classList.remove('hide');
+    }catch(e){ toast('Search is unavailable right now. Check your connection.', true); }
+    btn.textContent = 'Find';
+  }
+  btn.onclick = run;
+  inp.onkeydown = e => { if(e.key === 'Enter'){ e.preventDefault(); run(); } };
+}
+
+/* -------------------------------------------------------- point handling */
+function setPoint(which, pt){
+  S[which] = pt;
+  drawAnchors();
+  refresh();
+  if(which === 'start'){
+    map.setView([pt.lat, pt.lon], 13);
+  } else if(S.start){
+    map.fitBounds(L.latLngBounds([[S.start.lat,S.start.lon],[pt.lat,pt.lon]]).pad(.25));
+  }
+}
+function drawAnchors(){
+  layers.anchor.clearLayers();
+  if(S.start) L.marker([S.start.lat,S.start.lon], {
+    icon:L.divIcon({className:'', html:'<div class="startMarker"><span>A</span></div>', iconSize:[28,28], iconAnchor:[14,26]}),
+    zIndexOffset:1000
+  }).bindPopup('<b>Start</b><br>'+(S.start.label||'')).addTo(layers.anchor);
+  if(S.end) L.marker([S.end.lat,S.end.lon], {
+    icon:L.divIcon({className:'', html:'<div class="startMarker"><span>B</span></div>', iconSize:[28,28], iconAnchor:[14,26]}),
+    zIndexOffset:1000
+  }).bindPopup('<b>End</b><br>'+(S.end.label||'')).addTo(layers.anchor);
+}
+
+/* ------------------------------------------------- find outlets in range */
+async function refresh(){
+  if(!S.meta || !S.start){ updateReadout(); return; }
+  const centreLat = S.end ? (S.start.lat+S.end.lat)/2 : S.start.lat;
+  const centreLon = S.end ? (S.start.lon+S.end.lon)/2 : S.start.lon;
+  const span = S.end
+    ? hav(S.start.lat,S.start.lon,S.end.lat,S.end.lon)/2 + S.radius + 2
+    : S.radius + 2;
+
+  $('#mapBadge').textContent = 'Loading outlets…';
+  await loadArea(centreLat, centreLon, span);
+
+  const pool = tilesNear(centreLat, centreLon, span);
+  const out = [];
+  for(const o of pool){
+    if(!S.types.has(o.type)) continue;
+    const d = S.end
+      ? segDist(o.lat,o.lon, S.start.lat,S.start.lon, S.end.lat,S.end.lon)
+      : hav(S.start.lat,S.start.lon, o.lat,o.lon);
+    if(d <= S.radius){ o._d = d; out.push(o); }
+  }
+  out.sort((a,b)=> a._d - b._d);
+  S.inRange = out;
+  $('#loadedCount').textContent = out.length.toLocaleString('en-IN');
+  pickBeat();
+  drawDots();
+  updateReadout();
+  const bb = $('#buildBtn'); if(bb) bb.disabled = S.inRange.length === 0;
+  $('#mapBadge').textContent = out.length
+    ? `${out.length.toLocaleString('en-IN')} outlets · ${S.beat.length} on beat`
+    : 'No outlets match — widen the radius or add outlet types';
+}
+
+// choose the shortlist: forced-in first, then nearest, minus forced-out
+function pickBeat(){
+  const forced = S.inRange.filter(o => S.manual.get(KEY(o)) === true);
+  const rest = S.inRange.filter(o => S.manual.get(KEY(o)) !== true && S.manual.get(KEY(o)) !== false);
+  S.beat = [...forced, ...rest].slice(0, S.maxStops);
+  S.routeKm = null; S.routeMin = null;
+}
+
+function updateReadout(){
+  $('#roInRange').textContent = S.inRange.length ? S.inRange.length.toLocaleString('en-IN') : '—';
+  $('#roPlanned').textContent = S.beat.length || '—';
+  $('#roDist').textContent = S.routeKm ? fmtKm(S.routeKm) : '—';
+  const n = $('#densityNote');
+  if(!S.start){ n.textContent = 'Set a starting point to see what is around you.'; return; }
+  if(S.inRange.length > S.maxStops * 8){
+    n.innerHTML = `This is dense territory — <b>${S.inRange.length.toLocaleString('en-IN')}</b> outlets sit inside ${S.radius} km. The beat takes the ${S.beat.length} nearest. Tighten the radius or drop outlet types to focus it, and tap any grey dot on the map to force an outlet onto the beat.`;
+  } else if(S.inRange.length){
+    n.innerHTML = `<b>${S.inRange.length.toLocaleString('en-IN')}</b> outlets in range, <b>${S.beat.length}</b> on the beat. Tap any grey dot to add it.`;
+  } else {
+    n.textContent = 'Nothing in range yet. Widen the radius or switch more outlet types on.';
+  }
+  $('#stopBadge').textContent = S.beat.length;
+  $('#stopBadge').classList.toggle('hide', !S.beat.length);
+}
+
+/* -------------------------------------------------------------- map draw */
+function drawDots(){
+  layers.dots.clearLayers();
+  const onBeat = new Set(S.beat.map(KEY));
+  // cap for phone performance — nearest 700 only
+  S.inRange.slice(0, 700).forEach(o => {
+    if(onBeat.has(KEY(o))) return;
+    const m = L.circleMarker([o.lat,o.lon], {
+      radius:3.5, color:'#5A6779', weight:1, fillColor:'#94A3B8', fillOpacity:.7
+    });
+    m.bindPopup(`<b>${esc(o.name)}</b><br><span style="color:#5A6779">${esc(o.type)} · ${esc(o.region)}</span><br>
+      ${o._d.toFixed(1)} km away<br>
+      <button onclick="forceIn('${KEY(o)}')" style="margin-top:6px;padding:6px 10px;background:#E8930C;border:none;border-radius:6px;font-weight:600;cursor:pointer">Add to beat</button>`);
+    m.addTo(layers.dots);
+  });
+}
+function drawBeat(){
+  layers.stops.clearLayers();
+  S.beat.forEach((o,i) => {
+    const done = (S.logs[KEY(o)]||{}).status && S.logs[KEY(o)].status !== 'pending';
+    L.marker([o.lat,o.lon], {
+      icon:L.divIcon({className:'', html:`<div class="numMarker${done?' done':''}">${i+1}</div>`, iconSize:[26,26], iconAnchor:[13,13]}),
+      zIndexOffset:500
+    }).bindPopup(`<b>${i+1}. ${esc(o.name)}</b><br><span style="color:#5A6779">${esc(o.type)}</span><br>
+      <button onclick="forceOut('${KEY(o)}')" style="margin-top:6px;padding:6px 10px;background:#fff;border:1px solid #DDE3EA;border-radius:6px;cursor:pointer">Remove from beat</button>`)
+      .addTo(layers.stops);
+  });
+}
+window.forceIn = k => {
+  S.manual.set(k, true);
+  const o = S.inRange.find(x => KEY(x) === k);
+  if(o){ S.beat = [o, ...S.beat.filter(x => KEY(x)!==k)].slice(0, Math.max(S.maxStops, S.beat.length+1)); }
+  map.closePopup(); drawDots(); drawBeat(); renderStops(); updateReadout();
+  toast('Added to the beat');
+};
+window.forceOut = k => {
+  S.manual.set(k, false);
+  S.beat = S.beat.filter(x => KEY(x) !== k);
+  map.closePopup(); drawDots(); drawBeat(); renderStops(); updateReadout();
+  toast('Removed from the beat');
+};
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+/* ------------------------------------------------- route optimisation ---
+   Nearest-neighbour seed, then 2-opt on straight-line distance. Runs
+   entirely on the phone so it still works on a weak signal. OSRM is then
+   asked for the real road geometry; if it is unreachable we fall back to
+   straight lines and straight-line distance.                              */
+function optimise(pts, fixEnd){
+  const n = pts.length;
+  if(n <= 3) return pts.map((_,i)=>i);
+  const d = (a,b) => hav(pts[a].lat,pts[a].lon,pts[b].lat,pts[b].lon);
+  // nearest neighbour from index 0
+  const seen = new Set([0]); let order = [0], cur = 0;
+  const last = fixEnd ? n-1 : -1;
+  if(fixEnd) seen.add(last);
+  while(order.length < (fixEnd ? n-1 : n)){
+    let best = -1, bd = Infinity;
+    for(let i=0;i<n;i++){ if(seen.has(i)) continue; const t=d(cur,i); if(t<bd){bd=t;best=i;} }
+    order.push(best); seen.add(best); cur = best;
+  }
+  if(fixEnd) order.push(last);
+  // 2-opt over the interior
+  const lo = 1, hi = order.length - (fixEnd ? 2 : 1);
+  let improved = true, guard = 0;
+  while(improved && guard++ < 60){
+    improved = false;
+    for(let i=lo;i<hi;i++) for(let j=i+1;j<=hi;j++){
+      const a=order[i-1],b=order[i],c=order[j],e=order[j+1];
+      const before = d(a,b) + (e!==undefined ? d(c,e) : 0);
+      const after  = d(a,c) + (e!==undefined ? d(b,e) : 0);
+      if(after < before - 1e-9){
+        for(let x=i,y=j;x<y;x++,y--){ const t=order[x]; order[x]=order[y]; order[y]=t; }
+        improved = true;
+      }
+    }
+  }
+  return order;
+}
+
+async function buildRoute(){
+  if(!S.start || !S.beat.length) return;
+  const btn = $('#buildBtn');
+  btn.innerHTML = '<span class="spin"></span> Optimising…';
+  btn.disabled = true;
+
+  const pts = [{lat:S.start.lat, lon:S.start.lon, _anchor:'start'},
+               ...S.beat,
+               ...(S.end ? [{lat:S.end.lat, lon:S.end.lon, _anchor:'end'}] : [])];
+  const order = optimise(pts, !!S.end);
+  const seq = order.map(i => pts[i]);
+  S.beat = seq.filter(p => !p._anchor);
+
+  // road geometry from OSRM
+  layers.route.clearLayers();
+  let ok = false;
+  try{
+    const coords = seq.map(p => `${p.lon.toFixed(5)},${p.lat.toFixed(5)}`).join(';');
+    const r = await fetch(`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`);
+    const j = await r.json();
+    if(j.code === 'Ok' && j.routes[0]){
+      const g = j.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+      L.polyline(g, {color:'#E8930C', weight:5, opacity:.9}).addTo(layers.route);
+      L.polyline(g, {color:'#fff', weight:9, opacity:.35}).addTo(layers.route).bringToBack();
+      S.routeKm = j.routes[0].distance/1000;
+      S.routeMin = Math.round(j.routes[0].duration/60);
+      ok = true;
+    }
+  }catch(e){ /* offline or rate-limited — handled below */ }
+
+  if(!ok){
+    const line = seq.map(p => [p.lat, p.lon]);
+    L.polyline(line, {color:'#E8930C', weight:4, opacity:.8, dashArray:'7,7'}).addTo(layers.route);
+    let km = 0;
+    for(let i=1;i<seq.length;i++) km += hav(seq[i-1].lat,seq[i-1].lon,seq[i].lat,seq[i].lon);
+    S.routeKm = km * 1.35;   // rough road factor
+    S.routeMin = null;
+    toast('Road routing unavailable — showing straight-line order and an estimated distance.');
+  }
+
+  drawBeat(); drawDots(); renderStops(); updateReadout(); save();
+  map.fitBounds(L.latLngBounds(seq.map(p=>[p.lat,p.lon])).pad(.15));
+  btn.textContent = 'Rebuild optimised route';
+  btn.disabled = false;
+  toast(`Route built — ${S.beat.length} stops, ${fmtKm(S.routeKm)} km`);
+  go('stops');
+}
+
+/* --------------------------------------------------------- WhatsApp share */
+function waText(){
+  const d = new Date().toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'});
+  const head = `*CYCLE BEAT — ${($('#aeBeat').value || 'Field route')}*\n${d}` +
+    (S.start.label ? `\nStart: ${S.start.label.split(',').slice(0,2).join(',')}` : '') +
+    (S.end && S.end.label ? `\nEnd: ${S.end.label.split(',').slice(0,2).join(',')}` : '') +
+    `\n${S.beat.length} outlets · ~${fmtKm(S.routeKm)} km` +
+    (S.routeMin ? ` · ~${Math.floor(S.routeMin/60)}h ${S.routeMin%60}m drive` : '');
+
+  const lines = S.beat.map((o,i) =>
+    `${i+1}. *${o.name}* (${o.type})\n   https://maps.google.com/?q=${o.lat},${o.lon}`);
+
+  // Google Maps caps waypoints, so split the drive into legs of 10 stops
+  const legs = [];
+  const all = [S.start, ...S.beat, ...(S.end?[S.end]:[])];
+  for(let i=0;i<all.length-1;i+=9){
+    const chunk = all.slice(i, i+10);
+    if(chunk.length < 2) break;
+    const o = chunk[0], dst = chunk[chunk.length-1], mid = chunk.slice(1,-1);
+    let u = `https://www.google.com/maps/dir/?api=1&origin=${o.lat},${o.lon}&destination=${dst.lat},${dst.lon}&travelmode=driving`;
+    if(mid.length) u += '&waypoints=' + mid.map(p=>`${p.lat},${p.lon}`).join('|');
+    legs.push(`Leg ${legs.length+1} (stops ${i===0?1:i}–${i+chunk.length-1}):\n${u}`);
+  }
+  return `${head}\n\n${lines.join('\n')}\n\n*Turn-by-turn*\n${legs.join('\n\n')}`;
+}
+
+/* ---------------------------------------------------------- stops render */
+function renderStops(){
+  const list = $('#spineList');
+  $('#stopsEmpty').classList.toggle('hide', S.beat.length > 0);
+  $('#stopsHeader').classList.toggle('hide', S.beat.length === 0);
+  if(!S.beat.length){ list.innerHTML = ''; return; }
+
+  list.innerHTML = S.beat.map((o,i) => {
+    const k = KEY(o), lg = S.logs[k] || {status:'pending', remarks:'', photos:[]};
+    const photos = (lg.photos||[]).map((p,pi) =>
+      `<div class="thumb"><img src="${p.d}" alt=""><button data-del="${k}|${pi}" aria-label="Remove photo">×</button></div>`).join('');
+    return `
+    <div class="stop" data-status="${lg.status}" data-k="${k}">
+      <div class="rail"><div class="node">${i+1}</div></div>
+      <div class="stopCard">
+        <div class="stopHead">
+          <div style="flex:1;min-width:0">
+            <div class="stopName">${esc(o.name)}</div>
+            <div class="stopMeta">
+              <span class="tag">${esc(o.type)}</span>
+              <span>${esc(o.region)}, ${esc(o.st)}</span>
+              <span class="mono">${o._d != null ? o._d.toFixed(1)+' km' : ''}</span>
+            </div>
+          </div>
+          <a class="navBtn" href="https://maps.google.com/?q=${o.lat},${o.lon}" target="_blank" rel="noopener" aria-label="Navigate to ${esc(o.name)}">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1B2536" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+          </a>
+        </div>
+        <div class="statusRow">
+          <button data-s="visited"  data-k="${k}" aria-pressed="${lg.status==='visited'}">Visited</button>
+          <button data-s="closed"   data-k="${k}" aria-pressed="${lg.status==='closed'}">Closed</button>
+          <button data-s="notfound" data-k="${k}" aria-pressed="${lg.status==='notfound'}">Not found</button>
+        </div>
+        <textarea class="inp" data-rem="${k}" placeholder="Remarks — stock seen, board, competitor activity, retailer feedback…">${esc(lg.remarks||'')}</textarea>
+        <div class="photoStrip">
+          ${photos}
+          <button class="addPhoto" data-photo="${k}">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            Photo
+          </button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+  list.querySelectorAll('textarea').forEach(grow);
+}
+
+/* ------------------------------------------------------ log interactions */
+document.addEventListener('click', e => {
+  const st = e.target.closest('[data-s]');
+  if(st){
+    const k = st.dataset.k, v = st.dataset.s;
+    const lg = S.logs[k] = S.logs[k] || {status:'pending', remarks:'', photos:[]};
+    lg.status = (lg.status === v) ? 'pending' : v;
+    const row = st.closest('.stop');
+    row.dataset.status = lg.status;
+    row.querySelectorAll('[data-s]').forEach(b => b.setAttribute('aria-pressed', b.dataset.s === lg.status));
+    drawBeat(); save(); renderStats();
+    return;
+  }
+  const del = e.target.closest('[data-del]');
+  if(del){
+    const [k, pi] = del.dataset.del.split('|');
+    S.logs[k].photos.splice(+pi, 1);
+    renderStops(); save(); renderStats();
+    return;
+  }
+  const ph = e.target.closest('[data-photo]');
+  if(ph){
+    const inp = $('#photoInput');
+    inp.dataset.k = ph.dataset.photo;
+    inp.value = '';
+    inp.click();
+  }
+});
+document.addEventListener('input', e => {
+  if(e.target.dataset.rem){
+    const k = e.target.dataset.rem;
+    const lg = S.logs[k] = S.logs[k] || {status:'pending', remarks:'', photos:[]};
+    lg.remarks = e.target.value;
+    grow(e.target);
+    saveDebounced(); renderStats();
+  }
+});
+
+function grow(t){ t.style.height = 'auto'; t.style.height = Math.max(66, t.scrollHeight + 2) + 'px'; }
+
+/* ------------------------------------------------------- photo pipeline */
+$('#photoInput').onchange = async e => {
+  const k = e.target.dataset.k;
+  const files = [...e.target.files];
+  if(!files.length) return;
+  const lg = S.logs[k] = S.logs[k] || {status:'pending', remarks:'', photos:[]};
+  toast(`Compressing ${files.length} photo${files.length>1?'s':''}…`);
+  for(const f of files){
+    try{ lg.photos.push(await shrink(f)); }
+    catch(err){ toast('That image could not be read', true); }
+  }
+  if(lg.status === 'pending') lg.status = 'visited';
+  renderStops(); drawBeat(); save(); renderStats();
+  toast('Photo added');
+};
+function shrink(file, maxDim = 1280, q = 0.62){
+  return new Promise((res, rej) => {
+    const img = new Image();
+    img.onload = () => {
+      let {width:w, height:h} = img;
+      const sc = Math.min(1, maxDim/Math.max(w,h));
+      w = Math.round(w*sc); h = Math.round(h*sc);
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      c.getContext('2d').drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(img.src);
+      res({d:c.toDataURL('image/jpeg', q), w, h});
+    };
+    img.onerror = rej;
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+/* ------------------------------------------------------------ statistics */
+function renderStats(){
+  const total = S.beat.length;
+  let visited = 0, closed = 0, notfound = 0, remarks = 0, photos = 0;
+  S.beat.forEach(o => {
+    const lg = S.logs[KEY(o)] || {};
+    if(lg.status === 'visited') visited++;
+    if(lg.status === 'closed') closed++;
+    if(lg.status === 'notfound') notfound++;
+    if((lg.remarks||'').trim()) remarks++;
+    photos += (lg.photos||[]).length;
+  });
+  $('#statGrid').innerHTML = [
+    [total, 'Stops on beat'], [visited, 'Visited'],
+    [closed + notfound, 'Closed / not found'], [total - visited - closed - notfound, 'Pending'],
+    [remarks, 'With remarks'], [photos, 'Photos taken']
+  ].map(([v,l]) => `<div class="stat"><b>${v}</b><span>${l}</span></div>`).join('');
+  const pb = $('#pdfBtn2'); if(pb) pb.disabled = total === 0;
+}
+
+/* ------------------------------------------------------------------ PDF */
+async function makePDF(){
+  const {jsPDF} = window.jspdf;
+  const doc = new jsPDF({unit:'mm', format:'a4'});
+  const W = 210, M = 13;
+  let y = 0;
+
+  const dateStr = new Date().toLocaleDateString('en-IN', {day:'2-digit', month:'long', year:'numeric'});
+  const ae = $('#aeName').value.trim() || '—';
+  const br = $('#aeBranch').value.trim() || '—';
+  const beat = $('#aeBeat').value.trim() || 'Field route';
+
+  // header band
+  doc.setFillColor(15,23,36); doc.rect(0,0,W,30,'F');
+  doc.setFillColor(232,147,12); doc.rect(0,30,W,1.6,'F');
+  doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(17);
+  doc.text('CYCLE BEAT — OUTLET COVERAGE', M, 13);
+  doc.setFont('helvetica','normal'); doc.setFontSize(9.5); doc.setTextColor(180,190,205);
+  doc.text(`${beat}  ·  ${br}  ·  ${ae}  ·  ${dateStr}`, M, 20.5);
+  doc.text('Cycle-serviced outlets not currently covered by ITC', M, 25.5);
+  y = 40;
+
+  // summary strip
+  let visited=0, closed=0, notfound=0, photos=0;
+  S.beat.forEach(o => { const l = S.logs[KEY(o)]||{};
+    if(l.status==='visited') visited++;
+    if(l.status==='closed') closed++;
+    if(l.status==='notfound') notfound++;
+    photos += (l.photos||[]).length; });
+
+  const cells = [['Stops', S.beat.length], ['Visited', visited], ['Closed', closed],
+                 ['Not found', notfound], ['Photos', photos], ['Route km', fmtKm(S.routeKm)]];
+  const cw = (W - M*2)/cells.length;
+  cells.forEach(([l,v], i) => {
+    const x = M + i*cw;
+    doc.setDrawColor(221,227,234); doc.setFillColor(248,249,251);
+    doc.rect(x, y, cw, 15, 'FD');
+    doc.setTextColor(15,23,36); doc.setFont('helvetica','bold'); doc.setFontSize(13);
+    doc.text(String(v), x + cw/2, y + 7, {align:'center'});
+    doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(90,103,121);
+    doc.text(String(l).toUpperCase(), x + cw/2, y + 11.8, {align:'center'});
+  });
+  y += 23;
+
+  if(S.start){
+    doc.setFontSize(8.5); doc.setTextColor(90,103,121);
+    doc.text(doc.splitTextToSize('Start: ' + (S.start.label || `${S.start.lat.toFixed(5)}, ${S.start.lon.toFixed(5)}`), W-M*2), M, y);
+    y += 5;
+    if(S.end){ doc.text(doc.splitTextToSize('End: ' + (S.end.label || `${S.end.lat.toFixed(5)}, ${S.end.lon.toFixed(5)}`), W-M*2), M, y); y += 5; }
+  }
+  y += 3;
+
+  const STATUS = {visited:['VISITED',[18,161,80]], closed:['CLOSED',[229,72,77]],
+                  notfound:['NOT FOUND',[90,103,121]], pending:['PENDING',[160,170,185]]};
+
+  for(let i=0;i<S.beat.length;i++){
+    const o = S.beat[i], lg = S.logs[KEY(o)] || {status:'pending', remarks:'', photos:[]};
+    // text starts at M+12 and must stop at W-M, so the wrap width is (W-M) - (M+12)
+    const remarkLines = doc.splitTextToSize(lg.remarks?.trim() || 'No remarks recorded.', W - M*2 - 12);
+    const photoRows = Math.ceil((lg.photos||[]).length / 4);
+    const blockH = 20 + remarkLines.length*4.2 + photoRows*36;
+
+    if(y + blockH > 280){ doc.addPage(); y = 16; }
+
+    doc.setDrawColor(232,147,12); doc.setLineWidth(.8);
+    doc.line(M, y, M, y + blockH - 6);
+    doc.setLineWidth(.2);
+
+    doc.setTextColor(232,147,12); doc.setFont('helvetica','bold'); doc.setFontSize(11);
+    doc.text(String(i+1).padStart(2,'0'), M+3, y+4.5);
+
+    doc.setTextColor(15,23,36); doc.setFontSize(11);
+    doc.text((doc.splitTextToSize(String(o.name||'Unnamed outlet'), W-M*2-46)[0])||'Unnamed outlet', M+12, y+4.5);
+
+    const [txt, col] = STATUS[lg.status] || STATUS.pending;
+    doc.setFillColor(...col); doc.roundedRect(W-M-27, y, 27, 6, 1.5, 1.5, 'F');
+    doc.setTextColor(255,255,255); doc.setFontSize(6.5); doc.setFont('helvetica','bold');
+    doc.text(txt, W-M-13.5, y+4, {align:'center'});
+
+    doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(90,103,121);
+    doc.text(`${o.type}  ·  ${o.region}, ${o.st}  ·  ID ${o.id}  ·  ${o.lat.toFixed(5)}, ${o.lon.toFixed(5)}`, M+12, y+9.5);
+
+    doc.setFontSize(9); doc.setTextColor(30,41,59);
+    doc.text(remarkLines, M+12, y+15);
+    let ny = y + 15 + remarkLines.length*4.2;
+
+    (lg.photos||[]).forEach((p, pi) => {
+      const col2 = pi % 4, row = Math.floor(pi/4);
+      const px = M + 12 + col2*44, py = ny + 2 + row*36;
+      const ratio = p.h / p.w;
+      const pw = 40, ph = Math.min(32, pw * ratio);
+      try{ doc.addImage(p.d, 'JPEG', px, py, pw, ph); }catch(e){}
+      doc.setDrawColor(221,227,234); doc.rect(px, py, pw, ph);
+    });
+    if(photoRows) ny += photoRows*36;
+
+    y = ny + 7;
+    doc.setDrawColor(235,239,244); doc.line(M, y-4, W-M, y-4);
+  }
+
+  const pages = doc.internal.getNumberOfPages();
+  for(let p=1;p<=pages;p++){
+    doc.setPage(p);
+    doc.setFontSize(7.5); doc.setTextColor(140,150,165);
+    doc.text(`Cycle Beat · ${br} · ${dateStr}`, M, 291);
+    doc.text(`${p} / ${pages}`, W-M, 291, {align:'right'});
+  }
+
+  const fname = `CycleBeat_${beat.replace(/[^a-z0-9]+/gi,'-')}_${new Date().toISOString().slice(0,10)}.pdf`;
+  const blob = doc.output('blob');
+  const file = new File([blob], fname, {type:'application/pdf'});
+
+  if(navigator.canShare && navigator.canShare({files:[file]})){
+    try{ await navigator.share({files:[file], title:'Cycle Beat summary'}); return; }
+    catch(e){ if(e.name === 'AbortError') return; }
+  }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = fname; a.click();
+  setTimeout(()=> URL.revokeObjectURL(url), 4000);
+  toast('PDF downloaded');
+}
+
+/* --------------------------------------------------------- persistence */
+let db = null;
+function openDB(){
+  return new Promise(res => {
+    const rq = indexedDB.open('cycleBeat', 1);
+    rq.onupgradeneeded = () => rq.result.createObjectStore('trip');
+    rq.onsuccess = () => { db = rq.result; res(); };
+    rq.onerror = () => res();
+  });
+}
+function save(){
+  if(!db) return;
+  const payload = {
+    start:S.start, end:S.end, radius:S.radius, maxStops:S.maxStops,
+    types:[...S.types], beat:S.beat, logs:S.logs,
+    routeKm:S.routeKm, routeMin:S.routeMin, manual:[...S.manual], beatId:S.beatId,
+    ae:$('#aeName').value, branch:$('#aeBranch').value, beatName:$('#aeBeat').value
+  };
+  db.transaction('trip','readwrite').objectStore('trip').put(payload, 'current');
+}
+let saveT;
+function saveDebounced(){ clearTimeout(saveT); saveT = setTimeout(save, 600); }
+
+async function restore(){
+  if(!db) return;
+  const p = await new Promise(res => {
+    const rq = db.transaction('trip','readonly').objectStore('trip').get('current');
+    rq.onsuccess = () => res(rq.result); rq.onerror = () => res(null);
+  });
+  if(!p || !p.beat?.length) return;
+  S.start = p.start; S.end = p.end; S.radius = p.radius; S.maxStops = p.maxStops;
+  S.beat = p.beat; S.logs = p.logs || {}; S.routeKm = p.routeKm; S.routeMin = p.routeMin;
+  S.beatId = p.beatId || null;
+  S.manual = new Map(p.manual || []);
+  if(p.types?.length){ S.types = new Set(p.types); renderTypeChips(); }
+  $('#radius').value = S.radius; $('#radiusVal').textContent = S.radius;
+  $('#maxStops').value = S.maxStops; $('#maxStopsVal').textContent = S.maxStops;
+  $('#aeName').value = p.ae || ''; $('#aeBranch').value = p.branch || 'SHYD'; $('#aeBeat').value = p.beatName || '';
+  if(S.start) $('#startQ').value = (S.start.label||'').split(',')[0];
+  if(S.end) $('#endQ').value = (S.end.label||'').split(',')[0];
+  drawAnchors(); drawBeat(); renderStops(); renderStats(); updateReadout();
+  if(S.beat.length) map.fitBounds(L.latLngBounds(S.beat.map(o=>[o.lat,o.lon])).pad(.2));
+  const rb = $('#buildBtn');
+  if(rb){ rb.textContent = 'Rebuild optimised route'; rb.disabled = false; }
+  toast('Picked up your last beat');
+}
+
+/* ------------------------------------------------------------ UI wiring */
+function renderTypeChips(){
+  $('#typeChips').innerHTML = S.meta.types.map(t =>
+    `<button class="chip" data-type="${esc(t)}" aria-pressed="${S.types.has(t)}">${esc(t)}</button>`).join('');
+}
+$('#typeChips').addEventListener('click', e => {
+  const b = e.target.closest('[data-type]'); if(!b) return;
+  const t = b.dataset.type;
+  if(S.types.has(t)){ if(S.types.size === 1){ toast('Keep at least one outlet type on'); return; } S.types.delete(t); }
+  else S.types.add(t);
+  b.setAttribute('aria-pressed', S.types.has(t));
+  refresh();
+});
+
+$('#radius').oninput = e => { S.radius = +e.target.value; $('#radiusVal').textContent = S.radius; };
+$('#radius').onchange = () => refresh();
+$('#maxStops').oninput = e => { S.maxStops = +e.target.value; $('#maxStopsVal').textContent = S.maxStops; };
+$('#maxStops').onchange = () => { pickBeat(); drawDots(); drawBeat(); renderStops(); updateReadout(); };
+
+$('#gpsBtn').onclick = () => {
+  if(!navigator.geolocation){ toast('This browser cannot read your location', true); return; }
+  const b = $('#gpsBtn'); const orig = b.innerHTML;
+  b.innerHTML = '<span class="spin"></span> Locating…';
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      b.innerHTML = orig;
+      setPoint('start', {lat:pos.coords.latitude, lon:pos.coords.longitude, label:'Current location'});
+      $('#startQ').value = 'Current location';
+      toast('Located — accurate to about ' + Math.round(pos.coords.accuracy) + ' m');
+    },
+    err => {
+      b.innerHTML = orig;
+      toast(err.code === 1
+        ? 'Location is blocked. Allow it in the browser site settings, or search for the start point instead.'
+        : 'Could not get a fix. Move into the open and try again, or search for the start point.', true);
+    },
+    {enableHighAccuracy:true, timeout:12000, maximumAge:20000}
+  );
+};
+
+wireSearch('#startQ', '#startGo', '#startRes', 'start');
+wireSearch('#endQ', '#endGo', '#endRes', 'end');
+
+map.on('click', e => {
+  if(!S.start){ setPoint('start', {lat:e.latlng.lat, lon:e.latlng.lng, label:`Pinned ${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`}); toast('Start point pinned'); }
+});
+
+$('#buildBtn').onclick = buildRoute;
+$('#waBtn').onclick = () => {
+  if(!S.beat.length) return;
+  window.open('https://wa.me/?text=' + encodeURIComponent(waText()), '_blank');
+};
+async function runPDF(){
+  const b = $('#pdfBtn2');
+  if(!S.beat.length){ toast('Nothing to report yet'); return; }
+  if(b){ b.innerHTML = '<span class="spin"></span> Building…'; b.disabled = true; }
+  try{
+    await makePDF();
+    if(window.closeBeat && confirm('Report generated. Mark this beat as finished and file it to the branch?')) await closeBeat();
+  }
+  catch(e){ console.error(e); toast('The PDF could not be built. Try removing a few photos and go again.', true); }
+  if(b){ b.textContent = 'Generate PDF'; b.disabled = false; }
+}
+$('#aeName').oninput = $('#aeBranch').oninput = $('#aeBeat').oninput = saveDebounced;
+$('#resetBtn').onclick = () => {
+  if(!confirm('Clear this beat, all remarks and all photos from this phone?')) return;
+  S.beat = []; S.logs = {}; S.manual.clear(); S.routeKm = null; S.routeMin = null; S.beatId = null;
+  layers.route.clearLayers(); layers.stops.clearLayers();
+  renderStops(); renderStats(); updateReadout(); drawDots(); save();
+  const rb = $('#buildBtn'); if(rb) rb.textContent = 'Build optimised route';
+  go('plan'); toast('Cleared');
+};
+
+/* tabs */
+function go(tab){
+  S.tab = tab;
+  $$('.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === tab));
+  ['plan','stops','report'].forEach(t => $('#tab-'+t).classList.toggle('hide', t !== tab));
+  $('#mapWrap').classList.toggle('hide', tab === 'report' && window.innerWidth < 1024);
+  $('#dockInner').innerHTML = tab === 'plan'
+    ? `<button class="btn btn-signal btn-block" id="buildBtn" ${(S.inRange.length||S.beat.length)?'':'disabled'}>${S.beat.length && S.routeKm ? 'Rebuild optimised route' : 'Build optimised route'}</button>`
+    : tab === 'stops'
+      ? `<button class="btn btn-ghost" id="backPlan">Back to plan</button><button class="btn btn-go" id="toReport">Finish and report</button>`
+      : `<button class="btn btn-ghost" id="backStops">Back to stops</button><button class="btn btn-signal" id="pdfBtn2">Generate PDF</button>`;
+  const map2 = {backPlan:'plan', toReport:'report', backStops:'stops'};
+  Object.entries(map2).forEach(([id, t]) => { const el = $('#'+id); if(el) el.onclick = () => go(t); });
+  if($('#buildBtn')) $('#buildBtn').onclick = buildRoute;
+  if($('#pdfBtn2')) $('#pdfBtn2').onclick = runPDF;
+  if(tab === 'report') renderStats();
+  if(tab !== 'report') setTimeout(()=> map.invalidateSize(), 60);
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+$$('.tabs button').forEach(b => b.onclick = () => go(b.dataset.tab));
+
+/* ---------------------------------------------------------------- boot */
+(async function(){
+  await openDB();
+  await loadMeta();
+  if(S.meta){
+    $('#loadedCount').textContent = '0';
+    await restore();
+  }
+  renderStats();
+  updateReadout();
+  go('plan');
+})();
+</script>
+<script src="sync.js"></script>
+</body>
+</html>
