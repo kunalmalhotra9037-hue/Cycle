@@ -514,8 +514,8 @@ async function loadMeta(){
     S.meta.types.forEach(t => S.types.add(t));
     renderTypeChips();
   }catch(e){
-    toast('Could not load the outlet data. This page has to be served over http — open it from GitHub Pages, not straight off the file system.', true);
-    console.error(e);
+    S.meta = null;                 // outlet-source.js will try Supabase instead
+    console.warn('no bundled tile data:', e.message || e);
   }
 }
 function tileKey(lat,lon){
@@ -1237,6 +1237,7 @@ $$('.tabs button').forEach(b => b.onclick = () => go(b.dataset.tab));
   go('plan');
 })();
 </script>
+<script src="outlet-source.js"></script>
 <script src="sync.js"></script>
 </body>
 </html>

@@ -142,6 +142,30 @@ tr:hover td{background:#FCFCFD}
 <script src="vendor/supabase.js"></script>
 <script src="config.js"></script>
 <script>
+
+/* ------------------------------------------------------------------------
+   Dependency check. If a file is missing this page would otherwise die on
+   its first line and leave a dead screen, so say plainly what is absent.
+------------------------------------------------------------------------ */
+(function(){
+  const need = [{path:'config.js', test:()=>typeof window.CONFIG !== 'undefined'}, {path:'vendor/supabase.js', test:()=>typeof supabase !== 'undefined'}, {path:'vendor/leaflet.js', test:()=>typeof L !== 'undefined'}];
+  const missing = need.filter(f => !f.test());
+  if(!missing.length) return;
+  document.body.innerHTML =
+    '<div style="max-width:640px;margin:60px auto;padding:26px;font-family:system-ui,sans-serif;'
+    + 'background:#fff;border:1px solid #DDE3EA;border-radius:12px">'
+    + '<h1 style="font-size:20px;margin:0 0 10px;color:#0F1724">This page is missing some files</h1>'
+    + '<p style="color:#5A6779;margin:0 0 14px;line-height:1.55">These need to sit next to '
+    + '<code>dashboard.html</code> in the repo, and are not there:</p>'
+    + '<ul style="color:#9B1C1F;font-family:ui-monospace,monospace;font-size:13.5px;line-height:1.9;margin:0 0 16px">'
+    + missing.map(f => '<li>' + f.path + '</li>').join('')
+    + '</ul>'
+    + '<p style="color:#5A6779;margin:0;line-height:1.55">Upload the whole <b>cycle-beat-lean</b> folder '
+    + 'to the repo, not just this one page. Every file has to land beside <code>index.html</code>, '
+    + 'with <code>vendor/</code> kept as a folder.</p></div>';
+  throw new Error('missing: ' + missing.map(f => f.path).join(', '));
+})();
+
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
@@ -193,6 +217,7 @@ sb.auth.onAuthStateChange(async (_e, session) => {
   me = session.user;
   const {data: prof} = await sb.from('profiles').select('*').eq('id', me.id).maybeSingle();
   $('#who').innerHTML = `${esc(prof?.full_name || me.email)} · ${esc(prof?.role || 'ae')}
+    ${prof?.role === 'admin' ? '<a href="admin.html" style="color:var(--signal);text-decoration:none;margin-left:12px">Upload outlets</a>' : ''}
     <button id="out">Sign out</button>`;
   $('#out').onclick = () => sb.auth.signOut();
   gate.style.display = 'none';
