@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cycle Beat — Outlet upload</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#0F1724;--slate:#1B2536;--steel:#5A6779;--paper:#F6F7F9;--line:#DDE3EA;
+  --signal:#E8930C;--signal-soft:#FDF3E0;--go:#12A150;--alert:#E5484D;
+  --shadow:0 1px 2px rgba(15,23,36,.06),0 4px 14px rgba(15,23,36,.05)}
+*{box-sizing:border-box}
+body{margin:0;font-family:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  background:var(--paper);color:var(--ink);font-size:14.5px;line-height:1.45;-webkit-font-smoothing:antialiased}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer;border:none;background:none}
+.lbl{font-family:"Barlow Condensed",sans-serif;font-weight:600;text-transform:uppercase;
+  letter-spacing:.09em;font-size:12.5px;color:var(--steel)}
+.mono{font-family:"IBM Plex Mono",monospace;font-size:12px}
+
+.topbar{background:var(--ink);color:#fff;padding:12px 20px;display:flex;align-items:center;gap:14px;
+  position:sticky;top:0;z-index:900}
+.brand{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:22px;letter-spacing:.03em;line-height:1}
+.brand span{color:var(--signal)}
+.brand small{display:block;font-family:"IBM Plex Sans";font-weight:400;font-size:10.5px;
+  letter-spacing:.06em;text-transform:uppercase;color:#8A97AB;margin-top:2px}
+.topbar .who{margin-left:auto;font-size:12.5px;color:#8A97AB}
+.topbar .who a{color:var(--signal);text-decoration:none;margin-left:12px}
+.topbar .who button{color:var(--signal);margin-left:12px;font-size:12.5px}
+
+.wrap{max-width:1000px;margin:0 auto;padding:22px}
+.card{background:#fff;border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow);
+  margin-bottom:16px;overflow:hidden}
+.card h2{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:18px;letter-spacing:.05em;
+  text-transform:uppercase;margin:0;padding:14px 17px;border-bottom:1px solid var(--line);
+  display:flex;align-items:center;gap:9px}
+.card h2 .n{width:23px;height:23px;border-radius:50%;background:var(--signal);color:#20160A;
+  display:inline-flex;align-items:center;justify-content:center;font-size:13px}
+.card .body{padding:17px}
+.card.muted{opacity:.5;pointer-events:none}
+
+.drop{border:2px dashed var(--line);border-radius:11px;padding:36px 20px;text-align:center;
+  background:var(--paper);transition:border-color .15s,background .15s;cursor:pointer}
+.drop:hover,.drop.over{border-color:var(--signal);background:var(--signal-soft)}
+.drop b{display:block;font-family:"Barlow Condensed";font-weight:700;font-size:19px;
+  text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px}
+.drop span{color:var(--steel);font-size:13.5px}
+
+.btn{padding:10px 16px;border-radius:9px;font-weight:600;font-size:14.5px;border:1.5px solid transparent}
+.btn-primary{background:var(--ink);color:#fff}
+.btn-ghost{background:#fff;border-color:var(--line)}
+.btn-signal{background:var(--signal);color:#20160A}
+.btn-danger{background:var(--alert);color:#fff}
+.btn[disabled]{opacity:.45;pointer-events:none}
+.btn-block{width:100%;display:block}
+
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:9px;margin-bottom:14px}
+.stat{background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:11px}
+.stat b{display:block;font-family:"Barlow Condensed";font-weight:700;font-size:24px;line-height:1.1}
+.stat span{font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--steel)}
+.stat.bad b{color:var(--alert)}
+.stat.good b{color:var(--go)}
+
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{font-family:"Barlow Condensed",sans-serif;font-weight:600;text-transform:uppercase;letter-spacing:.07em;
+  font-size:11.5px;color:var(--steel);text-align:left;padding:8px 9px;border-bottom:1.5px solid var(--line)}
+td{padding:8px 9px;border-bottom:1px solid #EFF2F6}
+.mapRow{display:grid;grid-template-columns:150px 1fr;gap:10px;align-items:center;margin-bottom:9px}
+.mapRow select{width:100%;padding:8px 10px;border:1.5px solid var(--line);border-radius:8px;background:#fff}
+.mapRow select.miss{border-color:var(--alert);background:#FDECEC}
+
+.bar{height:9px;background:var(--line);border-radius:5px;overflow:hidden;margin:12px 0 7px}
+.bar div{height:100%;background:var(--signal);width:0;transition:width .25s}
+.prog{font-size:13px;color:var(--steel)}
+
+.note{font-size:13px;color:var(--steel);background:var(--paper);border-left:3px solid var(--signal);
+  padding:10px 12px;border-radius:0 7px 7px 0;margin-top:12px;line-height:1.55}
+.note.bad{border-left-color:var(--alert);background:#FDECEC;color:#8B1D20}
+.note.good{border-left-color:var(--go);background:#E7F6EE;color:#0B5C31}
+
+.radios{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:6px}
+.radios label{flex:1;min-width:200px;border:1.5px solid var(--line);border-radius:9px;padding:11px 13px;
+  cursor:pointer;background:#fff}
+.radios label:has(input:checked){border-color:var(--signal);background:var(--signal-soft)}
+.radios b{display:block;font-size:14px}
+.radios span{font-size:12.5px;color:var(--steel)}
+.radios input{margin-right:7px}
+
+#gate{position:fixed;inset:0;z-index:2000;background:var(--ink);color:#fff;
+  display:flex;align-items:center;justify-content:center;padding:24px}
+#gate .box{width:100%;max-width:360px}
+#gate h1{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:30px;letter-spacing:.03em;margin:0 0 4px}
+#gate h1 span{color:var(--signal)}
+#gate p{color:#8A97AB;font-size:13.5px;margin:0 0 22px;line-height:1.5}
+#gate label{display:block;font-family:"Barlow Condensed",sans-serif;font-weight:600;text-transform:uppercase;
+  letter-spacing:.09em;font-size:13px;color:#8A97AB;margin:0 0 5px}
+#gate input{width:100%;padding:12px;border-radius:10px;border:1.5px solid #2C3A4E;background:#16202E;
+  color:#fff;font-size:16px;margin-bottom:14px}
+#gate input:focus{outline:none;border-color:var(--signal)}
+#gate .msg{font-size:13px;margin-top:12px;min-height:18px;color:#FF9A9D}
+.spin{display:inline-block;width:14px;height:14px;border:2.5px solid rgba(255,255,255,.3);
+  border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px}
+.btn-ghost .spin,.btn-signal .spin{border-color:rgba(90,103,121,.3);border-top-color:var(--steel)}
+@keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">CYCLE<span>·</span>BEAT<small>Outlet upload</small></div>
+  <div class="who" id="who"></div>
+</div>
+
+<div class="wrap">
+
+  <!-- current state -->
+  <div class="card">
+    <h2>What is loaded now</h2>
+    <div class="body" id="current">Checking…</div>
+  </div>
+
+  <!-- 1. file -->
+  <div class="card" id="c1">
+    <h2><span class="n">1</span> Choose the file</h2>
+    <div class="body">
+      <div class="drop" id="drop">
+        <b>Drop the outlet file here</b>
+        <span>or click to browse — .xlsx, .xls or .csv</span>
+      </div>
+      <input type="file" id="file" accept=".xlsx,.xls,.csv" hidden>
+      <div class="note">
+        It needs a column each for state, outlet ID, name, outlet type, region,
+        latitude and longitude. Headers can be named anything — you map them in
+        the next step. Nothing is sent anywhere until you press upload.
+      </div>
+      <div id="parseMsg"></div>
+    </div>
+  </div>
+
+  <!-- 2. map columns -->
+  <div class="card muted" id="c2">
+    <h2><span class="n">2</span> Match the columns</h2>
+    <div class="body" id="mapBody"></div>
+  </div>
+
+  <!-- 3. check -->
+  <div class="card muted" id="c3">
+    <h2><span class="n">3</span> Check what came through</h2>
+    <div class="body" id="checkBody"></div>
+  </div>
+
+  <!-- 4. upload -->
+  <div class="card muted" id="c4">
+    <h2><span class="n">4</span> Send it up</h2>
+    <div class="body">
+      <div class="radios">
+        <label><b><input type="radio" name="mode" value="replace" checked>Replace everything</b>
+          <span>Clears the current list and loads this file. Use this for a fresh export.</span></label>
+        <label><b><input type="radio" name="mode" value="merge">Add and update</b>
+          <span>Keeps outlets not in this file, updates the ones that are. Use this for a partial list.</span></label>
+      </div>
+      <button class="btn btn-signal btn-block" id="up" style="margin-top:12px">Upload outlets</button>
+      <div class="bar" id="barWrap" style="display:none"><div id="bar"></div></div>
+      <div class="prog" id="prog"></div>
+      <div id="upMsg"></div>
+    </div>
+  </div>
+
+</div>
+
+<div id="lb"></div>
+
+<script src="vendor/xlsx.full.min.js"></script>
+<script src="vendor/supabase.js"></script>
+<script src="config.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const nfmt = n => (+n).toLocaleString('en-IN');
+
+if(!CONFIG.url || !CONFIG.anonKey){
+  document.body.innerHTML = '<div style="padding:80px;text-align:center;color:#5A6779">'
+    + '<b style="display:block;font-size:19px;color:#0F1724;margin-bottom:6px">Not configured</b>'
+    + 'Add your Supabase URL and anon key to config.js, then reload.</div>';
+  throw new Error('unconfigured');
+}
+const sb = supabase.createClient(CONFIG.url, CONFIG.anonKey, {auth:{persistSession:true}});
+
+/* ------------------------------------------------------------------ gate */
+const gate = document.createElement('div');
+gate.id = 'gate';
+gate.innerHTML = `<div class="box">
+  <h1>CYCLE<span>·</span>BEAT</h1>
+  <p>Outlet upload. You need an account with the admin role.</p>
+  <label for="e">Email</label><input id="e" type="email" autocomplete="username" autocapitalize="none">
+  <label for="p">Password</label><input id="p" type="password" autocomplete="current-password">
+  <button class="btn btn-signal btn-block" id="go">Sign in</button>
+  <div class="msg" id="m"></div></div>`;
+document.body.appendChild(gate);
+gate.querySelector('#go').onclick = async () => {
+  const b = gate.querySelector('#go');
+  b.innerHTML = '<span class="spin"></span>'; b.disabled = true;
+  const {error} = await sb.auth.signInWithPassword({
+    email: gate.querySelector('#e').value.trim(), password: gate.querySelector('#p').value});
+  b.textContent = 'Sign in'; b.disabled = false;
+  if(error){
+    const m = error.message || '';
+    gate.querySelector('#m').textContent =
+      /failed to fetch|networkerror|load failed/i.test(m) ? 'No connection to the server.'
+      : /invalid login/i.test(m) ? 'That email and password do not match.' : m;
+  }
+};
+gate.querySelector('#p').addEventListener('keydown', e => { if(e.key==='Enter') gate.querySelector('#go').click(); });
+
+let isAdmin = false;
+sb.auth.onAuthStateChange(async (_e, session) => {
+  if(!session){ gate.style.display = 'flex'; return; }
+  const {data: prof} = await sb.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
+  isAdmin = prof?.role === 'admin';
+  $('#who').innerHTML = `${esc(prof?.full_name || session.user.email)} · ${esc(prof?.role||'ae')}
+    <a href="dashboard.html">Branch view</a><a href="index.html">Field app</a>
+    <button id="out">Sign out</button>`;
+  $('#out').onclick = () => sb.auth.signOut();
+  gate.style.display = 'none';
+  if(!isAdmin){
+    $('#current').innerHTML = '<div class="note bad">This account is not an admin, so it cannot load '
+      + 'outlets. Ask whoever set up the project to give you the admin role.</div>';
+    ['c1','c2','c3','c4'].forEach(id => $('#'+id).classList.add('muted'));
+    return;
+  }
+  loadCurrent();
+});
+
+/* ------------------------------------------------- what is already loaded */
+async function loadCurrent(){
+  const {data, error} = await sb.from('outlet_stats').select('*');
+  if(error){
+    $('#current').innerHTML = `<div class="note bad">Could not read the outlet table — ${esc(error.message)}.
+      Have you run <b>supabase/outlets.sql</b> in the SQL editor yet?</div>`;
+    return;
+  }
+  if(!data.length){
+    $('#current').innerHTML = '<div class="note">No outlets loaded yet. Upload your file below and '
+      + 'the field app will start using it.</div>';
+    return;
+  }
+  const total = data.reduce((a,r) => a + (+r.outlets), 0);
+  const byState = {};
+  data.forEach(r => byState[r.state] = (byState[r.state]||0) + (+r.outlets));
+  const last = data.map(r => r.last_loaded).filter(Boolean).sort().pop();
+  $('#current').innerHTML = `
+    <div class="stats">
+      <div class="stat good"><b>${nfmt(total)}</b><span>Outlets live</span></div>
+      ${Object.entries(byState).sort((a,b)=>b[1]-a[1])
+        .map(([s,n]) => `<div class="stat"><b>${nfmt(n)}</b><span>${esc(s)}</span></div>`).join('')}
+    </div>
+    <div class="prog">Last loaded ${last ? new Date(last).toLocaleString('en-IN') : 'unknown'}</div>`;
+}
+
+/* ------------------------------------------------------------- file parse */
+let rows = [], headers = [], mapping = {}, clean = [], problems = [];
+
+const FIELDS = [
+  ['state',       'State',        ['state','st']],
+  ['outlet_id',   'Outlet ID',    ['id','outletid','outlet id','code']],
+  ['name',        'Outlet name',  ['name','outlet','outletname','outlet name','shop']],
+  ['outlet_type', 'Outlet type',  ['outlettype','outlet type','type','channel']],
+  ['region',      'Region',       ['region','district','branch','area']],
+  ['lat',         'Latitude',     ['latitude','lat']],
+  ['lon',         'Longitude',    ['longitude','lon','lng','long']]
+];
+
+const drop = $('#drop'), fileInp = $('#file');
+drop.onclick = () => fileInp.click();
+drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); };
+drop.ondragleave = () => drop.classList.remove('over');
+drop.ondrop = e => { e.preventDefault(); drop.classList.remove('over');
+  if(e.dataTransfer.files[0]) handle(e.dataTransfer.files[0]); };
+fileInp.onchange = e => { if(e.target.files[0]) handle(e.target.files[0]); };
+
+async function handle(file){
+  $('#parseMsg').innerHTML = '<div class="note"><span class="spin"></span> Reading ' + esc(file.name) + '…</div>';
+  try{
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, {type:'array', cellDates:false});
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    rows = XLSX.utils.sheet_to_json(sheet, {defval:'', raw:true});
+    if(!rows.length) throw new Error('That sheet has no rows.');
+    headers = Object.keys(rows[0]);
+    $('#parseMsg').innerHTML = `<div class="note good"><b>${esc(file.name)}</b> — ${nfmt(rows.length)} rows,
+      ${headers.length} columns, sheet "${esc(wb.SheetNames[0])}".</div>`;
+    buildMapping();
+  }catch(err){
+    $('#parseMsg').innerHTML = `<div class="note bad">Could not read that file — ${esc(err.message)}.
+      Save it as .xlsx or .csv and try again.</div>`;
+  }
+}
+
+const norm = s => String(s).toLowerCase().replace(/[^a-z]/g,'');
+function buildMapping(){
+  mapping = {};
+  FIELDS.forEach(([key,,aliases]) => {
+    const hit = headers.find(h => aliases.includes(norm(h)));
+    if(hit) mapping[key] = hit;
+  });
+  $('#mapBody').innerHTML = FIELDS.map(([key,label]) => `
+    <div class="mapRow">
+      <span class="lbl">${label}</span>
+      <select data-k="${key}" class="${mapping[key]?'':'miss'}">
+        <option value="">— not in this file —</option>
+        ${headers.map(h => `<option value="${esc(h)}" ${mapping[key]===h?'selected':''}>${esc(h)}</option>`).join('')}
+      </select>
+    </div>`).join('')
+    + '<button class="btn btn-primary" id="applyMap" style="margin-top:8px">Check the data</button>';
+  $('#c2').classList.remove('muted');
+  $('#mapBody').querySelectorAll('select').forEach(sel => sel.onchange = () => {
+    mapping[sel.dataset.k] = sel.value;
+    sel.classList.toggle('miss', !sel.value);
+  });
+  $('#applyMap').onclick = validate;
+  validate();
+}
+
+/* -------------------------------------------------------------- validate */
+function validate(){
+  const missing = FIELDS.filter(([k]) => !mapping[k]).map(([,l]) => l);
+  clean = []; problems = [];
+  const seen = new Set();
+  let dupes = 0;
+
+  for(let i = 0; i < rows.length; i++){
+    const r = rows[i];
+    const lat = parseFloat(r[mapping.lat]), lon = parseFloat(r[mapping.lon]);
+    const state = String(r[mapping.state] ?? '').trim().toUpperCase();
+    const oid = parseInt(r[mapping.outlet_id], 10);
+    const name = String(r[mapping.name] ?? '').trim();
+
+    let why = null;
+    if(!state) why = 'no state';
+    else if(!Number.isFinite(oid)) why = 'outlet ID is not a number';
+    else if(!name) why = 'no outlet name';
+    else if(!Number.isFinite(lat) || !Number.isFinite(lon)) why = 'latitude or longitude is not a number';
+    else if(lat < -90 || lat > 90 || lon < -180 || lon > 180) why = 'coordinates out of range';
+    else if(lat === 0 && lon === 0) why = 'coordinates are 0,0';
+
+    if(why){ if(problems.length < 40) problems.push({row:i+2, why, name:name||'—'}); continue; }
+
+    const key = state + '-' + oid;
+    if(seen.has(key)){ dupes++; continue; }
+    seen.add(key);
+
+    clean.push({
+      outlet_key: key, outlet_id: oid, state,
+      name: name.slice(0,120),
+      outlet_type: String(r[mapping.outlet_type] ?? '').trim() || null,
+      region: String(r[mapping.region] ?? '').trim() || null,
+      lat: +lat.toFixed(6), lon: +lon.toFixed(6)
+    });
+  }
+
+  const states = [...new Set(clean.map(o => o.state))].sort();
+  const types = [...new Set(clean.map(o => o.outlet_type).filter(Boolean))].sort();
+  const bad = rows.length - clean.length - dupes;
+
+  $('#checkBody').innerHTML = `
+    ${missing.length ? `<div class="note bad">Still need a column for: <b>${missing.join(', ')}</b>.
+      Pick them above before uploading.</div>` : ''}
+    <div class="stats">
+      <div class="stat good"><b>${nfmt(clean.length)}</b><span>Ready to upload</span></div>
+      <div class="stat ${bad?'bad':''}"><b>${nfmt(bad)}</b><span>Skipped</span></div>
+      <div class="stat"><b>${nfmt(dupes)}</b><span>Duplicate keys</span></div>
+      <div class="stat"><b>${states.length}</b><span>States</span></div>
+      <div class="stat"><b>${types.length}</b><span>Outlet types</span></div>
+    </div>
+    ${dupes ? `<div class="note">${nfmt(dupes)} rows repeated a state and outlet ID that had already
+      appeared. Only the first was kept — outlet IDs repeat across states in this data, so the key
+      is state plus ID.</div>` : ''}
+    ${problems.length ? `<div class="note bad"><b>First ${problems.length} skipped rows</b><br>
+      ${problems.map(p => `Row ${p.row}: ${esc(p.why)} — ${esc(p.name)}`).join('<br>')}</div>` : ''}
+    ${states.length ? `<div class="note">States: ${states.map(esc).join(', ')}<br>
+      Types: ${types.map(esc).join(', ') || '—'}</div>` : ''}
+    ${clean.length ? `<table style="margin-top:12px"><thead><tr>
+        <th>Key</th><th>Name</th><th>Type</th><th>Region</th><th>Lat</th><th>Lon</th></tr></thead>
+      <tbody>${clean.slice(0,5).map(o => `<tr>
+        <td class="mono">${esc(o.outlet_key)}</td><td>${esc(o.name)}</td>
+        <td>${esc(o.outlet_type||'—')}</td><td>${esc(o.region||'—')}</td>
+        <td class="mono">${o.lat}</td><td class="mono">${o.lon}</td></tr>`).join('')}</tbody></table>
+      <div class="prog" style="margin-top:7px">First 5 of ${nfmt(clean.length)}</div>` : ''}`;
+
+  $('#c3').classList.remove('muted');
+  $('#c4').classList.toggle('muted', !clean.length || missing.length > 0);
+}
+
+/* ---------------------------------------------------------------- upload */
+$('#up').onclick = async () => {
+  if(!clean.length) return;
+  const mode = document.querySelector('input[name=mode]:checked').value;
+  const verb = mode === 'replace'
+    ? `Replace the entire outlet list with these ${nfmt(clean.length)} outlets?\n\nEverything currently loaded will be deleted.`
+    : `Add or update ${nfmt(clean.length)} outlets, keeping everything else?`;
+  if(!confirm(verb)) return;
+
+  const btn = $('#up');
+  btn.innerHTML = '<span class="spin"></span> Uploading…'; btn.disabled = true;
+  $('#barWrap').style.display = 'block';
+  $('#upMsg').innerHTML = '';
+
+  const BATCH = 2000;
+  try{
+    // clear anything left in staging from a previous run
+    await sb.from('outlets_staging').delete().neq('outlet_key', '');
+
+    for(let i = 0; i < clean.length; i += BATCH){
+      const chunk = clean.slice(i, i + BATCH);
+      const {error} = await sb.from('outlets_staging').upsert(chunk, {onConflict:'outlet_key'});
+      if(error) throw error;
+      const done = Math.min(i + BATCH, clean.length);
+      $('#bar').style.width = (done / clean.length * 92) + '%';
+      $('#prog').textContent = `Staged ${nfmt(done)} of ${nfmt(clean.length)}…`;
+    }
+
+    $('#prog').textContent = 'Committing — the field app switches over in one step…';
+    const {data, error} = await sb.rpc('commit_outlets', {p_mode: mode});
+    if(error) throw error;
+
+    $('#bar').style.width = '100%';
+    const res = Array.isArray(data) ? data[0] : data;
+    $('#prog').textContent = '';
+    $('#upMsg').innerHTML = `<div class="note good"><b>Done.</b>
+      ${nfmt(res?.inserted ?? clean.length)} outlets loaded.
+      The list now holds ${nfmt(res?.total ?? 0)}. AEs pick this up on their next search.</div>`;
+    loadCurrent();
+  }catch(err){
+    const m = err.message || String(err);
+    $('#upMsg').innerHTML = `<div class="note bad"><b>Upload stopped.</b> ${esc(m)}<br><br>
+      ${/row-level security|permission|admin/i.test(m)
+        ? 'That account does not have the admin role. Set it in the SQL editor, then sign out and back in.'
+        : /does not exist|schema cache/i.test(m)
+        ? 'The outlet tables are missing — run <b>supabase/outlets.sql</b> in the SQL editor first.'
+        : 'Nothing was committed, so the live list is untouched. Fix the problem and run it again.'}</div>`;
+  }
+  btn.textContent = 'Upload outlets'; btn.disabled = false;
+};
+</script>
+</body>
+</html>
