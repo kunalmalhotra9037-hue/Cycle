@@ -114,6 +114,7 @@ tr:hover td{background:#FCFCFD}
   <div class="bar">
     <div><span class="lbl">From</span><input class="inp" type="date" id="fFrom"></div>
     <div><span class="lbl">To</span><input class="inp" type="date" id="fTo"></div>
+    <div><span class="lbl">Branch</span><select class="inp" id="fBranch"><option value="">All branches</option></select></div>
     <div><span class="lbl">AE</span><select class="inp" id="fAe"><option value="">Everyone</option></select></div>
     <div><span class="lbl">Status</span><select class="inp" id="fStatus">
       <option value="">All beats</option><option value="open">Open</option><option value="closed">Filed</option>
@@ -123,6 +124,10 @@ tr:hover td{background:#FCFCFD}
   </div>
 
   <div class="kpis" id="kpis"></div>
+  <div class="card" id="branchCard" style="display:none">
+    <h2>By branch</h2>
+    <div class="body" style="padding:0"><div id="branchTable"></div></div>
+  </div>
 
   <div class="grid">
     <div class="card">
@@ -169,6 +174,15 @@ tr:hover td{background:#FCFCFD}
   throw new Error('missing: ' + missing.map(f => f.path).join(', '));
 })();
 
+
+/* AEs sign in with just their handle; the domain is added here so nobody has
+   to type "@cyclebeat.in" on a phone keyboard. A full address still works. */
+function asEmail(v){
+  v = String(v || '').trim().toLowerCase();
+  if(!v) return v;
+  return v.includes('@') ? v : v + '@' + ((window.CONFIG && CONFIG.loginDomain) || 'cyclebeat.in');
+}
+
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
@@ -178,7 +192,7 @@ if(!CONFIG.url || !CONFIG.anonKey){
 }
 const sb = supabase.createClient(CONFIG.url, CONFIG.anonKey, {auth:{persistSession:true}});
 
-let me = null, beats = [], current = null, visitCache = {};
+let me = null, beats = [], current = null, visitCache = {}, profiles = [];
 
 /* ------------------------------------------------------------------- map */
 const map = L.map('map', {zoomControl:true}).setView([17.385, 78.4867], 11);
@@ -192,7 +206,7 @@ gate.id = 'gate';
 gate.innerHTML = `<div class="box">
   <h1>CYCLE<span>·</span>BEAT</h1>
   <p>Branch view. Sign in with an account whose role is set to admin.</p>
-  <label for="e">Email</label><input id="e" type="email" autocomplete="username" autocapitalize="none">
+  <label for="e">Login</label><input id="e" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="e.g. kunal">
   <label for="p">Password</label><input id="p" type="password" autocomplete="current-password">
   <button class="btn btn-signal btn-block" id="go">Sign in</button>
   <div class="msg" id="m"></div></div>`;
@@ -201,7 +215,7 @@ gate.querySelector('#go').onclick = async () => {
   const b = gate.querySelector('#go');
   b.innerHTML = '<span class="spin"></span>'; b.disabled = true;
   const {error} = await sb.auth.signInWithPassword({
-    email: gate.querySelector('#e').value.trim(),
+    email: asEmail(gate.querySelector('#e').value.trim()),
     password: gate.querySelector('#p').value
   });
   b.textContent = 'Sign in'; b.disabled = false;
@@ -209,7 +223,7 @@ gate.querySelector('#go').onclick = async () => {
     const m = error.message || '';
     gate.querySelector('#m').textContent =
       /failed to fetch|networkerror|load failed/i.test(m) ? 'No connection to the server. Check your network and try again.'
-      : /invalid login/i.test(m) ? 'That email and password do not match.'
+      : /invalid login/i.test(m) ? 'That login and password do not match.'
       : m;
   }
 };
@@ -233,27 +247,41 @@ sb.auth.onAuthStateChange(async (_e, session) => {
 
 /* ------------------------------------------------------------------ load */
 async function loadAes(){
-  const {data} = await sb.from('profiles').select('id,full_name').order('full_name');
+  const {data} = await sb.from('profiles').select('id,full_name,branch').order('full_name');
   if(!data) return;
+  profiles = data;
+  const branches = [...new Set(data.map(p => p.branch).filter(Boolean))].sort();
+  $('#fBranch').innerHTML = '<option value="">All branches</option>' +
+    branches.map(b => `<option value="${esc(b)}">${esc(b)}</option>`).join('');
+  renderAeOptions();
+}
+
+// the AE list follows the branch, so picking SHYD does not leave 70 names in the box
+function renderAeOptions(){
+  const br = $('#fBranch').value;
+  const keep = $('#fAe').value;
+  const list = br ? profiles.filter(p => p.branch === br) : profiles;
   $('#fAe').innerHTML = '<option value="">Everyone</option>' +
-    data.map(p => `<option value="${p.id}">${esc(p.full_name || p.id.slice(0,8))}</option>`).join('');
+    list.map(p => `<option value="${p.id}">${esc(p.full_name || p.id.slice(0,8))}</option>`).join('');
+  if(list.some(p => p.id === keep)) $('#fAe').value = keep;
 }
 
 async function load(){
   $('#beatList').innerHTML = '<div class="empty">Loading…</div>';
   let q = sb.from('beat_summary').select('*').order('created_at', {ascending:false}).limit(300);
   const from = $('#fFrom').value, to = $('#fTo').value,
-        ae = $('#fAe').value, st = $('#fStatus').value;
+        ae = $('#fAe').value, st = $('#fStatus').value, br = $('#fBranch').value;
   if(from) q = q.gte('created_at', from + 'T00:00:00Z');
   if(to)   q = q.lte('created_at', to   + 'T23:59:59Z');
   if(ae)   q = q.eq('user_id', ae);
+  if(br)   q = q.eq('branch', br);
   if(st === 'open')   q = q.is('closed_at', null);
   if(st === 'closed') q = q.not('closed_at', 'is', null);
 
   const {data, error} = await q;
   if(error){ $('#beatList').innerHTML = `<div class="empty"><b>Could not load</b>${esc(error.message)}</div>`; return; }
   beats = data || [];
-  renderKpis(); renderBeats();
+  renderKpis(); renderBranches(); renderBeats();
 }
 
 function renderKpis(){
@@ -273,6 +301,36 @@ function renderKpis(){
   ].map(([v,l]) => `<div class="kpi"><b>${v}</b><span>${l}</span></div>`).join('');
 }
 
+function renderBranches(){
+  const card = $('#branchCard');
+  const rows = {};
+  beats.forEach(b => {
+    const k = b.branch || '(not set)';
+    const t = rows[k] = rows[k] || {beats:0, stops:0, visited:0, gone:0, photos:0, km:0, aes:new Set()};
+    t.beats++; t.stops += +b.stops || 0; t.visited += +b.visited || 0;
+    t.gone += (+b.closed || 0) + (+b.notfound || 0);
+    t.photos += +b.photos || 0; t.km += +b.route_km || 0;
+    if(b.user_id) t.aes.add(b.user_id);
+  });
+  const keys = Object.keys(rows).sort();
+  if(keys.length < 2){ card.style.display = 'none'; return; }
+  card.style.display = '';
+  $('#branchTable').innerHTML = `<table>
+    <thead><tr><th>Branch</th><th>AEs out</th><th>Beats</th><th>Planned</th>
+      <th>Visited</th><th>Strike rate</th><th>Closed / NF</th><th>Photos</th><th>Road km</th></tr></thead>
+    <tbody>${keys.map(k => {
+      const t = rows[k], rate = t.stops ? Math.round(t.visited / t.stops * 100) : 0;
+      return `<tr class="brRow" data-br="${esc(k)}" style="cursor:pointer">
+        <td><b>${esc(k)}</b></td><td>${t.aes.size}</td><td>${t.beats}</td><td>${t.stops}</td>
+        <td>${t.visited}</td><td><b>${rate}%</b></td><td>${t.gone}</td>
+        <td>${t.photos}</td><td>${Math.round(t.km)}</td></tr>`;
+    }).join('')}</tbody></table>`;
+  document.querySelectorAll('.brRow').forEach(el => el.onclick = () => {
+    if(el.dataset.br === '(not set)') return;
+    $('#fBranch').value = el.dataset.br; renderAeOptions(); load();
+  });
+}
+
 function renderBeats(){
   if(!beats.length){
     $('#beatList').innerHTML = '<div class="empty"><b>No beats yet</b>Nothing matches these filters.</div>';
@@ -285,7 +343,7 @@ function renderBeats(){
       <div class="t">${esc(b.beat_name || 'Unnamed beat')}
         <span class="pillx ${done?'done':'open'}">${done?'Filed':'Open'}</span></div>
       <div class="m">
-        <span>${esc(b.ae_name || '—')}</span><span>${d}</span>
+        <span>${esc(b.ae_name || '—')}</span>${b.branch ? `<span class="pillx open">${esc(b.branch)}</span>` : ''}<span>${d}</span>
         <span>${b.visited||0}/${b.stops||0} done</span>
         <span>${b.photos||0} photos</span>
         ${b.route_km ? `<span>${(+b.route_km).toFixed(1)} km</span>` : ''}
@@ -389,6 +447,7 @@ $('#csvAll').onclick = async () => {
 
 $('#reload').onclick = () => { visitCache = {}; load(); };
 ['fFrom','fTo','fAe','fStatus'].forEach(id => $('#'+id).onchange = load);
+$('#fBranch').onchange = () => { renderAeOptions(); load(); };
 
 // default window: the last 30 days
 const t = new Date(), a = new Date(Date.now() - 30*864e5);
