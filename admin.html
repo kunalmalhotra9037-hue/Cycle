@@ -54,6 +54,14 @@ button{cursor:pointer;border:none;background:none}
 .btn[disabled]{opacity:.45;pointer-events:none}
 .btn-block{width:100%;display:block}
 
+.tabsRow{display:flex;gap:8px;margin-bottom:16px}
+.tabsRow button{padding:9px 18px;border-radius:9px;background:#fff;border:1.5px solid var(--line);
+  font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:15px;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--steel)}
+.tabsRow button[aria-selected="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
+.oneRow{display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px}
+.oneRow > div{display:flex;flex-direction:column;gap:4px}
+@media(max-width:640px){.oneRow{grid-template-columns:1fr}}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:9px;margin-bottom:14px}
 .stat{background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:11px}
 .stat b{display:block;font-family:"Barlow Condensed";font-weight:700;font-size:24px;line-height:1.1}
@@ -113,6 +121,12 @@ td{padding:8px 9px;border-bottom:1px solid #EFF2F6}
 
 <div class="wrap">
 
+  <div class="tabsRow" id="tabs">
+    <button data-pane="outlets" aria-selected="true">Outlets</button>
+    <button data-pane="team" aria-selected="false">Team logins</button>
+  </div>
+
+  <div id="pane-outlets">
   <!-- current state -->
   <div class="card">
     <h2>What is loaded now</h2>
@@ -165,6 +179,59 @@ td{padding:8px 9px;border-bottom:1px solid #EFF2F6}
       <div id="upMsg"></div>
     </div>
   </div>
+  </div><!-- /pane-outlets -->
+
+  <div id="pane-team" style="display:none">
+    <div class="card">
+      <h2>Who has a login</h2>
+      <div class="body" id="teamNow">Checking…</div>
+    </div>
+
+    <div class="card">
+      <h2><span class="n">1</span> Add people from a file</h2>
+      <div class="body">
+        <div class="drop" id="tDrop">
+          <b>Drop the employee file here</b>
+          <span>or click to browse — .xlsx, .xls or .csv</span>
+        </div>
+        <input type="file" id="tFile" accept=".xlsx,.xls,.csv" hidden>
+        <div class="note">
+          It needs a column for employee name, and ideally employee ID and branch.
+          Anyone who already has a login is skipped — their password is never touched —
+          so you can re-upload the whole team list to add just the new joiners.
+        </div>
+        <div id="tParseMsg"></div>
+      </div>
+    </div>
+
+    <div class="card muted" id="tc2">
+      <h2><span class="n">2</span> Match the columns</h2>
+      <div class="body" id="tMapBody"></div>
+    </div>
+
+    <div class="card muted" id="tc3">
+      <h2><span class="n">3</span> Check and create</h2>
+      <div class="body" id="tCheckBody"></div>
+    </div>
+
+    <div class="card" id="tResultCard" style="display:none">
+      <h2>New logins</h2>
+      <div class="body" id="tResult"></div>
+    </div>
+
+    <div class="card">
+      <h2>Add one person</h2>
+      <div class="body">
+        <div class="oneRow">
+          <div><span class="lbl">Name</span><input class="inp" id="oName" placeholder="HARISH J"></div>
+          <div><span class="lbl">Employee ID</span><input class="inp" id="oId" placeholder="116808"></div>
+          <div><span class="lbl">Branch</span><input class="inp" id="oBranch" placeholder="SHYD"></div>
+        </div>
+        <button class="btn btn-primary" id="oGo" style="margin-top:10px">Create login</button>
+        <div id="oMsg"></div>
+      </div>
+    </div>
+  </div>
 
 </div>
 
@@ -200,6 +267,15 @@ td{padding:8px 9px;border-bottom:1px solid #EFF2F6}
   throw new Error('missing: ' + missing.map(f => f.path).join(', '));
 })();
 
+
+/* AEs sign in with just their handle; the domain is added here so nobody has
+   to type "@cyclebeat.in" on a phone keyboard. A full address still works. */
+function asEmail(v){
+  v = String(v || '').trim().toLowerCase();
+  if(!v) return v;
+  return v.includes('@') ? v : v + '@' + ((window.CONFIG && CONFIG.loginDomain) || 'cyclebeat.in');
+}
+
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const nfmt = n => (+n).toLocaleString('en-IN');
@@ -218,7 +294,7 @@ gate.id = 'gate';
 gate.innerHTML = `<div class="box">
   <h1>CYCLE<span>·</span>BEAT</h1>
   <p>Outlet upload. You need an account with the admin role.</p>
-  <label for="e">Email</label><input id="e" type="email" autocomplete="username" autocapitalize="none">
+  <label for="e">Login</label><input id="e" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="e.g. kunal">
   <label for="p">Password</label><input id="p" type="password" autocomplete="current-password">
   <button class="btn btn-signal btn-block" id="go">Sign in</button>
   <div class="msg" id="m"></div></div>`;
@@ -227,13 +303,13 @@ gate.querySelector('#go').onclick = async () => {
   const b = gate.querySelector('#go');
   b.innerHTML = '<span class="spin"></span>'; b.disabled = true;
   const {error} = await sb.auth.signInWithPassword({
-    email: gate.querySelector('#e').value.trim(), password: gate.querySelector('#p').value});
+    email: asEmail(gate.querySelector('#e').value.trim()), password: gate.querySelector('#p').value});
   b.textContent = 'Sign in'; b.disabled = false;
   if(error){
     const m = error.message || '';
     gate.querySelector('#m').textContent =
       /failed to fetch|networkerror|load failed/i.test(m) ? 'No connection to the server.'
-      : /invalid login/i.test(m) ? 'That email and password do not match.' : m;
+      : /invalid login/i.test(m) ? 'That login and password do not match.' : m;
   }
 };
 gate.querySelector('#p').addEventListener('keydown', e => { if(e.key==='Enter') gate.querySelector('#go').click(); });
@@ -302,7 +378,7 @@ drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); };
 drop.ondragleave = () => drop.classList.remove('over');
 drop.ondrop = e => { e.preventDefault(); drop.classList.remove('over');
   if(e.dataTransfer.files[0]) handle(e.dataTransfer.files[0]); };
-fileInp.onchange = e => { if(e.target.files[0]) handle(e.target.files[0]); };
+fileInp.onchange = e => { const f = e.target.files[0]; e.target.value = ''; if(f) handle(f); };
 
 async function handle(file){
   $('#parseMsg').innerHTML = '<div class="note"><span class="spin"></span> Reading ' + esc(file.name) + '…</div>';
@@ -495,6 +571,274 @@ $('#up').onclick = async () => {
   }
   btn.textContent = 'Upload outlets'; btn.disabled = false;
 };
+
+/* =======================================================================
+   TEAM LOGINS
+   Same shape as the outlet upload: pick a file, match the columns, check,
+   create. Anyone who already has a login is skipped untouched, so the whole
+   team list can be re-uploaded to add only the new joiners.
+======================================================================= */
+const LOGIN_DOMAIN = (window.CONFIG && CONFIG.loginDomain) || 'cyclebeat.in';
+
+document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('#tabs button').forEach(x => x.setAttribute('aria-selected', x === b));
+  $('#pane-outlets').style.display = b.dataset.pane === 'outlets' ? '' : 'none';
+  $('#pane-team').style.display    = b.dataset.pane === 'team'    ? '' : 'none';
+  if(b.dataset.pane === 'team') loadTeam();
+});
+
+let team = [];
+
+function nameTokens(n){ return String(n||'').toLowerCase().replace(/[^a-z ]/g,' ').split(/\s+/).filter(Boolean); }
+function makeHandle(name){
+  const t = nameTokens(name);
+  if(!t.length) return '';
+  const full = t.join('.');
+  return full.length <= 20 ? full : t[0] + '.' + t[t.length-1];
+}
+function makePassword(empId){
+  const id = String(empId || '').replace(/\D/g,'');
+  return 'Cycle@' + (id || Math.floor(100000 + Math.random()*900000));
+}
+
+async function loadTeam(){
+  const {data, error} = await sb.rpc('team_directory');
+  if(error){
+    $('#teamNow').innerHTML = `<div class="note bad">Could not read the team list — ${esc(error.message)}.
+      Have you run <b>supabase/team.sql</b> in the SQL editor yet?</div>`;
+    team = []; return;
+  }
+  team = data || [];
+  const byBranch = {};
+  team.forEach(t => { const k = t.branch || '(none)'; byBranch[k] = (byBranch[k]||0)+1; });
+  const admins = team.filter(t => t.role === 'admin').length;
+  const used   = team.filter(t => t.last_sign_in_at).length;
+  $('#teamNow').innerHTML = `
+    <div class="stats">
+      <div class="stat good"><b>${nfmt(team.length)}</b><span>Logins</span></div>
+      <div class="stat"><b>${nfmt(used)}</b><span>Have signed in</span></div>
+      <div class="stat"><b>${admins}</b><span>Admins</span></div>
+      ${Object.entries(byBranch).sort().map(([b,n]) =>
+        `<div class="stat"><b>${n}</b><span>${esc(b)}</span></div>`).join('')}
+    </div>`;
+}
+
+/* ---------------------------------------------------------------- file */
+let tRows = [], tHeaders = [], tMap = {}, tClean = [];
+const T_FIELDS = [
+  ['name',   'Employee name', ['employeename','name','employee','aename']],
+  ['emp_id', 'Employee ID',   ['employeeid','empid','id','code']],
+  ['branch', 'Branch',        ['branch','branchcode','br']],
+  ['role',   'Designation',   ['designation','role','title']]
+];
+
+$('#tDrop').onclick = () => $('#tFile').click();
+$('#tDrop').ondragover = e => { e.preventDefault(); $('#tDrop').classList.add('over'); };
+$('#tDrop').ondragleave = () => $('#tDrop').classList.remove('over');
+$('#tDrop').ondrop = e => { e.preventDefault(); $('#tDrop').classList.remove('over');
+  if(e.dataTransfer.files[0]) tHandle(e.dataTransfer.files[0]); };
+$('#tFile').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if(f) tHandle(f); };
+
+async function tHandle(file){
+  $('#tParseMsg').innerHTML = '<div class="note"><span class="spin"></span> Reading ' + esc(file.name) + '…</div>';
+  try{
+    const wb = XLSX.read(await file.arrayBuffer(), {type:'array'});
+    const sh = wb.Sheets[wb.SheetNames[0]];
+    tRows = XLSX.utils.sheet_to_json(sh, {defval:'', raw:true});
+    if(!tRows.length) throw new Error('That sheet has no rows.');
+    tHeaders = Object.keys(tRows[0]);
+    $('#tParseMsg').innerHTML = `<div class="note good"><b>${esc(file.name)}</b> — ${nfmt(tRows.length)} rows.</div>`;
+    tBuildMap();
+  }catch(err){
+    $('#tParseMsg').innerHTML = `<div class="note bad">Could not read that file — ${esc(err.message)}</div>`;
+  }
+}
+
+function tBuildMap(){
+  tMap = {};
+  T_FIELDS.forEach(([k,,al]) => {
+    const hit = tHeaders.find(h => al.includes(String(h).toLowerCase().replace(/[^a-z]/g,'')));
+    if(hit) tMap[k] = hit;
+  });
+  $('#tMapBody').innerHTML = T_FIELDS.map(([k,label]) => `
+    <div class="mapRow">
+      <span class="lbl">${label}</span>
+      <select data-tk="${k}" class="${tMap[k]?'':(k==='name'?'miss':'')}">
+        <option value="">— not in this file —</option>
+        ${tHeaders.map(h => `<option value="${esc(h)}" ${tMap[k]===h?'selected':''}>${esc(h)}</option>`).join('')}
+      </select>
+    </div>`).join('')
+    + '<button class="btn btn-primary" id="tApply" style="margin-top:8px">Check the list</button>';
+  $('#tc2').classList.remove('muted');
+  $('#tMapBody').querySelectorAll('select').forEach(sel => sel.onchange = () => {
+    tMap[sel.dataset.tk] = sel.value;
+    sel.classList.toggle('miss', !sel.value && sel.dataset.tk === 'name');
+  });
+  $('#tApply').onclick = tValidate;
+  tValidate();
+}
+
+function tValidate(){
+  tClean = [];
+  const skipped = [];
+  const taken = new Set(team.map(t => (t.handle||'').toLowerCase()));
+  const knownIds = new Set(team.map(t => String(t.employee_id||'')).filter(Boolean));
+  const seen = new Set();
+
+  if(!tMap.name){
+    $('#tCheckBody').innerHTML = '<div class="note bad">Pick the column holding the employee name.</div>';
+    $('#tc3').classList.remove('muted');
+    return;
+  }
+
+  tRows.forEach((r, i) => {
+    const name = String(r[tMap.name] ?? '').trim();
+    const empId = tMap.emp_id ? String(r[tMap.emp_id] ?? '').trim() : '';
+    const branch = tMap.branch ? String(r[tMap.branch] ?? '').trim().toUpperCase() : (CONFIG.branch || 'SHYD');
+    const desig = tMap.role ? String(r[tMap.role] ?? '').trim() : '';
+    if(!name){ skipped.push({row:i+2, why:'no name'}); return; }
+
+    let handle = makeHandle(name);
+    if(!handle){ skipped.push({row:i+2, why:'name has no letters'}); return; }
+
+    const already = knownIds.has(empId) || taken.has(handle);
+    if(already){ skipped.push({row:i+2, why:'already has a login', name}); return; }
+
+    // a different person with the same handle gets their employee ID appended
+    if(seen.has(handle)) handle = handle + '.' + (empId || (i+1));
+    seen.add(handle);
+
+    tClean.push({
+      name, empId, branch, desig, handle,
+      email: handle + '@' + LOGIN_DOMAIN,
+      password: makePassword(empId)
+    });
+  });
+
+  const dupNote = skipped.filter(s => s.why === 'already has a login').length;
+  $('#tCheckBody').innerHTML = `
+    <div class="stats">
+      <div class="stat good"><b>${nfmt(tClean.length)}</b><span>New logins to create</span></div>
+      <div class="stat"><b>${nfmt(dupNote)}</b><span>Already have one</span></div>
+      <div class="stat ${skipped.length-dupNote?'bad':''}"><b>${nfmt(skipped.length-dupNote)}</b><span>Skipped</span></div>
+    </div>
+    ${tClean.length ? `<table style="margin-top:4px"><thead><tr>
+        <th>Name</th><th>Branch</th><th>Login</th><th>Password</th></tr></thead>
+      <tbody>${tClean.slice(0,8).map(c => `<tr><td>${esc(c.name)}</td><td>${esc(c.branch)}</td>
+        <td class="mono"><b>${esc(c.handle)}</b></td><td class="mono">${esc(c.password)}</td></tr>`).join('')}
+      </tbody></table>
+      <div class="prog" style="margin-top:6px">Showing ${Math.min(8,tClean.length)} of ${nfmt(tClean.length)}</div>
+      <button class="btn btn-signal btn-block" id="tGo" style="margin-top:12px">Create ${nfmt(tClean.length)} logins</button>
+      <div class="bar" id="tBarWrap" style="display:none"><div id="tBar"></div></div>
+      <div class="prog" id="tProg"></div>`
+      : '<div class="note">Nobody new in this file — everyone already has a login.</div>'}`;
+  $('#tc3').classList.remove('muted');
+  const g = $('#tGo'); if(g) g.onclick = tCreate;
+}
+
+async function tCreate(){
+  if(!tClean.length) return;
+  if(!confirm(`Create ${tClean.length} new logins?`)) return;
+  const btn = $('#tGo');
+  btn.innerHTML = '<span class="spin"></span> Creating…'; btn.disabled = true;
+  $('#tBarWrap').style.display = 'block';
+
+  const made = [], failed = [];
+  for(let i = 0; i < tClean.length; i++){
+    const c = tClean[i];
+    try{
+      const {data, error} = await sb.rpc('create_login', {
+        p_email:c.email, p_password:c.password, p_full_name:c.name,
+        p_branch:c.branch || 'SHYD', p_role:'ae',
+        p_employee_id: c.empId ? Number(c.empId) : null
+      });
+      if(error) throw error;
+      const res = Array.isArray(data) ? data[0] : data;
+      (res && res.created ? made : failed).push({...c, note: res ? res.note : 'no response'});
+    }catch(e){ failed.push({...c, note: e.message || String(e)}); }
+    $('#tBar').style.width = ((i+1)/tClean.length*100) + '%';
+    $('#tProg').textContent = `Created ${nfmt(made.length)} of ${nfmt(tClean.length)}…`;
+  }
+
+  $('#tProg').textContent = '';
+  $('#tResultCard').style.display = '';
+  $('#tResult').innerHTML = `<div class="note ${made.length?'good':'bad'}">
+    <b>${nfmt(made.length)} logins created.</b>
+    ${failed.length ? nfmt(failed.length) + ' could not be created — ' + esc(failed[0].note) : ''}
+    <br><br>Download the list and hand it out. Passwords are not recoverable later —
+    you can only set a new one.
+    <br><button class="btn btn-ghost" id="tCsv" style="margin-top:8px">Download logins as CSV</button></div>
+    <table style="margin-top:12px"><thead><tr><th>Name</th><th>Branch</th><th>Login</th><th>Password</th></tr></thead>
+    <tbody>${made.map(m => `<tr><td>${esc(m.name)}</td><td>${esc(m.branch)}</td>
+      <td class="mono"><b>${esc(m.handle)}</b></td><td class="mono">${esc(m.password)}</td></tr>`).join('')}
+    </tbody></table>`;
+  const cs = $('#tCsv');
+  if(cs) cs.onclick = () => {
+    const rows = made.map(m => ({name:m.name, employee_id:m.empId, branch:m.branch,
+                                designation:m.desig, login:m.handle, password:m.password}));
+    const cols = ['name','employee_id','branch','designation','login','password'];
+    const cell = v => /[",\n]/.test(v ?? '') ? '"'+String(v).replace(/"/g,'""')+'"' : (v ?? '');
+    const out = [cols.join(',')].concat(rows.map(r => cols.map(c => cell(r[c])).join(','))).join('\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob(['\ufeff'+out], {type:'text/csv;charset=utf-8'}));
+    a.download = 'CycleBeat_new_logins_' + new Date().toISOString().slice(0,10) + '.csv';
+    a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+  };
+  btn.textContent = 'Create logins'; btn.disabled = false;
+  tClean = [];
+  await loadTeam();
+  $('#tCheckBody').innerHTML = '<div class="note">Done — the new logins are listed below. '
+    + 'Upload another file to add more people.</div>';
+  $('#tResultCard').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+/* ------------------------------------------------------- one at a time */
+$('#oGo').onclick = async () => {
+  const name = $('#oName').value.trim();
+  const id   = $('#oId').value.trim();
+  const br   = $('#oBranch').value.trim().toUpperCase() || CONFIG.branch || 'SHYD';
+  if(!name){ $('#oMsg').innerHTML = '<div class="note bad">Enter a name.</div>'; return; }
+  let handle = makeHandle(name);
+  // same employee ID, or same handle with no ID to tell them apart -> already on the team
+  const samePerson = team.find(t =>
+    (id && String(t.employee_id||'') === id) ||
+    (!id && (t.handle||'').toLowerCase() === handle));
+  if(samePerson){
+    $('#oMsg').innerHTML = `<div class="note"><b>${esc(samePerson.full_name || name)}</b> already has a login
+      (<b class="mono">${esc(samePerson.handle)}</b>). Nothing was changed. Use a password reset if they
+      have forgotten theirs.</div>`;
+    return;
+  }
+  // a different person who happens to share the handle gets their ID appended
+  if(team.some(t => (t.handle||'').toLowerCase() === handle)){
+    if(!id){
+      $('#oMsg').innerHTML = '<div class="note bad">Someone with that name already has a login. '
+        + 'Add the employee ID so the two can be told apart.</div>';
+      return;
+    }
+    handle = handle + '.' + id;
+  }
+  const pass = makePassword(id);
+  const btn = $('#oGo');
+  btn.innerHTML = '<span class="spin"></span>'; btn.disabled = true;
+  try{
+    const {data, error} = await sb.rpc('create_login', {
+      p_email: handle + '@' + LOGIN_DOMAIN, p_password: pass, p_full_name: name,
+      p_branch: br, p_role: 'ae', p_employee_id: id ? Number(id) : null});
+    if(error) throw error;
+    const res = Array.isArray(data) ? data[0] : data;
+    $('#oMsg').innerHTML = res && res.created
+      ? `<div class="note good"><b>Created.</b> Login <b class="mono">${esc(handle)}</b>,
+         password <b class="mono">${esc(pass)}</b>. Write this down — it cannot be shown again.</div>`
+      : `<div class="note"><b>${esc(handle)}</b> already has a login. Nothing was changed.</div>`;
+    $('#oName').value = ''; $('#oId').value = '';
+    await loadTeam();
+  }catch(e){
+    $('#oMsg').innerHTML = `<div class="note bad">${esc(e.message || String(e))}</div>`;
+  }
+  btn.textContent = 'Create login'; btn.disabled = false;
+};
+
 </script>
 </body>
 </html>
